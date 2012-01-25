@@ -28,7 +28,7 @@ public class Matrix
         
     }
     
-    public void setRow(Integer rowIndex, Integer[] row)
+    public void setRow(Integer[] row, Integer rowIndex)
     {
         if (row.length < size)
             return;
@@ -39,7 +39,7 @@ public class Matrix
         }
     }
 
-    private void print()
+    public void print()
     {
         for (int i = 0; i < size; i++)
         {
