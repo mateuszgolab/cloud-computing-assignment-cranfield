@@ -13,8 +13,8 @@ public class MainMaster
     
     public static final String DATA_QUEUE = "matDataQueue";
     public static final String RESULT_QUEUE = "matResultQueue";
-    public static final Integer N = 20;
-    public static final Integer KEY = 512;
+    public static final Integer N = 1000;
+    public static final Integer KEY = 1000;
 
     private static Matrix matrixA;
     private static Matrix matrixB;
@@ -24,7 +24,8 @@ public class MainMaster
     
     public static void main(String[] args)
     {
-        Logger.getLogger("com.amazonaws.request").setLevel(Level.OFF);
+        Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
+
         
         matrixA = new Matrix(N);
         matrixA.generateRandomValues(KEY);
@@ -32,11 +33,13 @@ public class MainMaster
         matrixB.generateRandomValues(KEY);
         matrixC = matrixA.add(matrixB);
         matrixD = new Matrix(N);
-
+        
         
         Master m = new Master(matrixA, matrixB, KEY);
         m.connectQueues(DATA_QUEUE, RESULT_QUEUE);
         m.distributeData();
+        
+
 
     }
     

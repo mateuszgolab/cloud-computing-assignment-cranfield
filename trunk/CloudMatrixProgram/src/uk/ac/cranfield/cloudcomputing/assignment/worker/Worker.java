@@ -2,6 +2,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.worker;
 
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixAdditionDataChunk;
+
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
@@ -93,7 +95,7 @@ public class Worker
                 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
                 List<Message> messages = result.getMessages();
-                
+
                 if (messages.size() > 0)
                 {
                     Message m = messages.get(0);
@@ -137,32 +139,22 @@ public class Worker
     public String processRowsAddition(Message m)
     {
         String data = m.getBody();
-        Integer key = (int) data.charAt(0);
-        Integer size = (int) data.charAt(2);
-        Integer[] sum = new Integer[size];
+        String[] values = data.split(MatrixAdditionDataChunk.separator);
+        String result = "";
         
+        Integer size = Integer.parseInt(values[1]);
+        Integer j = 0;
+        Integer tmp = 0;
         
-        String result = data.substring(0, 3);
+        for (j = 0; j < 2; j++)
+            result += values[j] + MatrixAdditionDataChunk.separator;
         
-        
-        Integer index = 3;
         
         for (int i = 0; i < size; i++)
         {
-            sum[i] = data.charAt(index + i) - key;
+            tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
+            result += tmp.toString() + MatrixAdditionDataChunk.separator;
         }
-        
-        index += size;
-        
-        // x - key + y - key + key = x - key + y (so ready to string it)
-        for (int i = 0; i < size; i++)
-        {
-            sum[i] += (int) data.charAt(index + i);
-        }
-        
-        
-        for (Integer i : sum)
-            result += (char) i.intValue();
         
         return result;
         

@@ -2,18 +2,15 @@ package uk.ac.cranfield.cloudcomputing.assignment.common;
 
 
 
-public class MatrixAdditionDataChunk
+public class MatrixAdditionDataChunk extends MatrixDataChunk
 {
     
-    private Integer rowIndex;
-    private Integer key;
     private Integer[] rowA;
     private Integer[] rowB;
     
-    public MatrixAdditionDataChunk(Integer[] a, Integer[] b, Integer row, Integer k)
+    public MatrixAdditionDataChunk(Integer[] a, Integer[] b, Integer rowIndex, Integer size)
     {
-        rowIndex = row;
-        key = k;
+        super(rowIndex, size);
         rowA = a;
         rowB = b;
     }
@@ -21,43 +18,33 @@ public class MatrixAdditionDataChunk
     
     /**
      * ******************************************
-     * |key|rowIndex|Matrix A row|0|Matrix B row|
+     * |rowIndex|size|Matrix A row|Matrix B row|
      * ******************************************
      */
     @Override
     public String toString()
     {
         String result = "";
-        char separator = 0;
-        
-        result += (char) key.intValue();
-        result += (char) rowIndex.intValue();
-        result += getCompressedData(rowA);
-        result += separator;
-        result += getCompressedData(rowB);
-        
+
+        result += rowIndex.intValue() + separator;
+        result += rowA.length + separator;
+        result += getRowData(rowA);
+        result += getRowData(rowB);
+
         return result;
 
     }
     
-    private String getCompressedData(Integer[] row)
+    public String getRowData(Integer[] row)
     {
         String result = "";
         for (int i = 0; i < row.length; i++)
         {
-            int value = row[i] + key;
-            result += (char) value;
+            result += row[i] + separator;
         }
         
         return result;
         
-        
-        // System.out.println("++++++++++");
-        // for (int i = 0; i < s.length(); i++)
-        // {
-        // int x = s.charAt(i) - 512;
-        // System.out.println(x);
-        // }
     }
 
 

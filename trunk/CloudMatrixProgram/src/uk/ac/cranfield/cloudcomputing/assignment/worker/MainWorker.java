@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 
 
+
 public class MainWorker
 {
     
@@ -16,7 +17,8 @@ public class MainWorker
 
     public static void main(String[] args)
     {
-        Logger.getLogger("com.amazonaws.request").setLevel(Level.OFF);
+
+        Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
 
         Worker w = new Worker();
         w.connectQueues(DATA_QUEUE, RESULT_QUEUE);

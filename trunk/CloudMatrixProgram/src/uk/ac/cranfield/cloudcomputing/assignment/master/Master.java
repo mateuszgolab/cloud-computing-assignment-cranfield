@@ -37,6 +37,7 @@ public class Master
     private Matrix matrixB;
     private Matrix matrixResult;
     private Integer key;
+    private Integer rowIndex;
 
     
     public Master()
@@ -59,6 +60,7 @@ public class Master
         this();
         matrixA = a;
         matrixB = b;
+        matrixResult = new Matrix(a.getSize());
         key = k;
         iterations = a.getSize();
     }
@@ -98,20 +100,40 @@ public class Master
 
     }
     
-    
     public void distributeData()
     {
         
         time = System.currentTimeMillis();
         
-        for (int i = 0; i < matrixA.getSize(); i++)
+        try
         {
-            MatrixAdditionDataChunk chunk = new MatrixAdditionDataChunk(matrixA.getRow(i), matrixB.getRow(i), i, key);
-            SendMessageRequest smr = new SendMessageRequest(dataQueueURL, chunk.toString());
-            sqsClient.sendMessage(smr);
-
+            
+            for (int i = 0; i < matrixA.getSize(); i++)
+            {
+                MatrixAdditionDataChunk chunk = new MatrixAdditionDataChunk(matrixA.getRow(i), matrixB.getRow(i), i,
+                        key);
+                SendMessageRequest smr = new SendMessageRequest(dataQueueURL, chunk.toString());
+                sqsClient.sendMessage(smr);
+                
+            }
         }
-
+        catch (AmazonServiceException ase)
+        {
+            System.out.println("Caught an AmazonServiceException, which means your request made it "
+                    + "to Amazon SQS, but was rejected with an error response for some reason.");
+            System.out.println("Error Message:        " + ase.getMessage());
+            System.out.println("HTTP Status Code: " + ase.getStatusCode());
+            System.out.println("AWS Error Code:   " + ase.getErrorCode());
+            System.out.println("Error Type:           " + ase.getErrorType());
+            System.out.println("Request ID:           " + ase.getRequestId());
+        }
+        catch (AmazonClientException ace)
+        {
+            System.out.println("Caught an AmazonClientException, which means the client encountered "
+                    + "a serious internal problem while trying to communicate with SQS, such as not "
+                    + "being able to access the network.");
+            System.out.println("Error Message: " + ace.getMessage());
+        }
         receiveResults();
 
     }
@@ -132,7 +154,7 @@ public class Master
                 {
                     Message m = messages.get(0);
                     String data = m.getBody();
-                    matrixResult.setRow(getRowIndex(data), getRow(data));
+                    matrixResult.setRow(getRow(data), getRowIndex(data));
 
                     DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
                     sqsClient.deleteMessage(delMes);
@@ -155,6 +177,9 @@ public class Master
         finally
         {
             System.out.println("Time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+            // matrixA.print();
+            // matrixB.print();
+            // matrixResult.print();
         }
     }
     
@@ -167,26 +192,27 @@ public class Master
         
     }
     
-    private Integer[] getRow(String data)
+    public Integer[] getRow(String data)
     {
-        Integer key = (int) data.charAt(0);
-        Integer size = (int) data.charAt(2);
-        Integer[] sum = new Integer[size];
+        String[] values = data.split(MatrixAdditionDataChunk.separator);
+        rowIndex = Integer.parseInt(values[0]);
+        Integer size = Integer.parseInt(values[1]);
+
+        Integer i = 2;
+        Integer[] row = new Integer[size];
         
-        
-        Integer index = 3;
-        
-        for (int i = 0; i < size; i++)
+        while (i < values.length)
         {
-            sum[i] = data.charAt(index + i) - key;
+            row[i - 2] = Integer.parseInt(values[i]);
+            i++;
         }
         
-        return sum;
+        return row;
     }
     
     private Integer getRowIndex(String data)
     {
-        return (int) data.charAt(1);
+        return rowIndex;
     }
 
 

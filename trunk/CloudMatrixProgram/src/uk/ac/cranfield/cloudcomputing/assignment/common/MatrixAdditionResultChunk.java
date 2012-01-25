@@ -3,26 +3,22 @@ package uk.ac.cranfield.cloudcomputing.assignment.common;
 
 
 
-public class MatrixAdditionResultChunk
+public class MatrixAdditionResultChunk extends MatrixDataChunk
 {
     
-    private Integer rowIndex;
-    private Integer key;
-    private Integer[] rowA;
-    private Integer[] rowB;
+    private Integer[] row;
     
-    public MatrixAdditionResultChunk(Integer[] a, Integer[] b, Integer row, Integer k)
+    public MatrixAdditionResultChunk(Integer[] row, Integer rowIndex, Integer size)
     {
-        rowIndex = row;
-        key = k;
-        rowA = a;
-        rowB = b;
+        super(rowIndex, size);
+        this.row = row;
+
     }
     
     
     /**
      * ******************************************
-     * |key|rowIndex|Matrix A row|0|Matrix B row|
+     * |rowIndex|size|Matrix A + B row|
      * ******************************************
      */
     @Override
@@ -30,28 +26,26 @@ public class MatrixAdditionResultChunk
     {
         String result = "";
         
-        result += (char) key.intValue();
-        result += (char) rowIndex.intValue();
-        result += (char) rowA.length;
-        result += getCompressedData(rowA);
-        result += getCompressedData(rowB);
-        
+        result += rowIndex.intValue() + separator;
+        result += size.intValue() + separator;
+        result += getRowData();
+
         return result;
-        
+
     }
     
-    private String getCompressedData(Integer[] row)
+    public String getRowData()
     {
         String result = "";
         for (int i = 0; i < row.length; i++)
         {
-            int value = row[i] + key;
-            result += (char) value;
+            result += row[i] + separator;
         }
         
         return result;
         
         
+
     }
     
     
