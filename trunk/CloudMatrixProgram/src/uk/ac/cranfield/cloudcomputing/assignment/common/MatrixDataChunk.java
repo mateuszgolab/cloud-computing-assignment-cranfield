@@ -16,4 +16,16 @@ public abstract class MatrixDataChunk
     
     @Override
     public abstract String toString();
+    
+    protected String getData(Integer[] data)
+    {
+        String result = "";
+        for (int i = 0; i < data.length; i++)
+        {
+            result += data[i] + separator;
+        }
+        
+        return result;
+        
+    }
 }
