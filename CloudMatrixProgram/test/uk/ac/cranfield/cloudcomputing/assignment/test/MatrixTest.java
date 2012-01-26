@@ -38,14 +38,14 @@ public class MatrixTest
         }
         
         Worker w = new Worker();
-        Master m = new Master();
+        Master m = new Master(1);
         
 
         MatrixAdditionDataChunk chunk = new MatrixAdditionDataChunk(m1.getRow(1), m2.getRow(1), 0, 10);
         Message me = new Message();
         me.setBody(chunk.toString());
         
-        Integer[] ints = m.getRow(w.processRowsAddition(me));
+        Integer[] ints = m.getRow(w.processDataAddition(me));
         
         
         for (int i = 0; i < 10; i++)

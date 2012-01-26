@@ -108,7 +108,7 @@ public class Worker
                     }
                     
                     // System.out.println("Received : " + m.getBody());
-                    String res = processRowsAddition(m);
+                    String res = processDataAddition(m);
                     SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
                     sqsClient.sendMessage(smr);
                     
@@ -136,7 +136,7 @@ public class Worker
     }
     
     
-    public String processRowsAddition(Message m)
+    public String processDataAddition(Message m)
     {
         String data = m.getBody();
         String[] values = data.split(MatrixAdditionDataChunk.separator);
@@ -161,4 +161,30 @@ public class Worker
         
     }
     
+    public String processDataMultiplication(Message m)
+    {
+        String data = m.getBody();
+        String[] values = data.split(MatrixAdditionDataChunk.separator);
+        String result = "";
+        
+        Integer size = Integer.parseInt(values[1]);
+        Integer j = 0;
+        Integer tmp = 0;
+        
+        for (j = 0; j < 2; j++)
+            result += values[j] + MatrixAdditionDataChunk.separator;
+        
+        
+        for (int i = 0; i < size; i++)
+        {
+            tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
+            result += tmp.toString() + MatrixAdditionDataChunk.separator;
+        }
+        
+        return result;
+        
+        
+    }
+
+
 }

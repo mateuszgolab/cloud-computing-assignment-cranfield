@@ -54,6 +54,8 @@ public class Matrix
     
     public Matrix add(Matrix m)
     {
+        long time = System.currentTimeMillis();
+
         if(m.getSize() != size) return null;
         
         Matrix result = new Matrix(size);
@@ -66,9 +68,40 @@ public class Matrix
             }
         }
         
+        System.out.println("Sequential " + size + " x " + size + " matrix addition time elapsed : "
+                + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+
         return result;
     }
     
+    public Matrix multiply(Matrix m)
+    {
+        long time = System.currentTimeMillis();
+        
+        if (m.getSize() != size)
+            return null;
+        
+        Matrix result = new Matrix(size);
+        
+        for (int i = 0; i < size; i++)
+        {
+            for (int j = 0; j < size; j++)
+            {
+                int tmp = 0;
+                for (int k = 0; k < size; k++)
+                {
+                    tmp += matrix[i][k] * m.getValue(k, j);
+                }
+                result.setValue(i, j, tmp);
+            }
+        }
+        
+        System.out.println("Sequential " + size + " x " + size + " matrix multiplication time elapsed : "
+                + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+        
+        return result;
+    }
+
     public Integer getSize()
     {
         return size;
@@ -113,5 +146,17 @@ public class Matrix
         }
         
         return row;
+    }
+    
+    public Integer[] getColumn(Integer columnIndex)
+    {
+        Integer[] column = new Integer[size];
+        
+        for (int i = 0; i < size; i++)
+        {
+            column[i] = matrix[i][columnIndex];
+        }
+        
+        return column;
     }
 }

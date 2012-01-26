@@ -4,6 +4,7 @@ import java.util.List;
 
 import uk.ac.cranfield.cloudcomputing.assignment.common.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixAdditionDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixMultiplicationDataChunk;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -38,12 +39,13 @@ public class Master
     private Matrix matrixResult;
     private Integer key;
     private Integer rowIndex;
+    private Integer numberOfWorkers;
 
     
-    public Master()
+    public Master(Integer workers)
     {
         iterations = 0;
-
+        numberOfWorkers = workers;
         credentials = null;
         sqsClient = null;
         credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
@@ -55,9 +57,9 @@ public class Master
         sqsClient.setEndpoint(ENDPOINT_ZONE);
     }
     
-    public Master(Matrix a, Matrix b, Integer k)
+    public Master(Integer w, Matrix a, Matrix b, Integer k)
     {
-        this();
+        this(w);
         matrixA = a;
         matrixB = b;
         matrixResult = new Matrix(a.getSize());
@@ -100,7 +102,7 @@ public class Master
 
     }
     
-    public void distributeData()
+    public void matrixAddition()
     {
         
         time = System.currentTimeMillis();
@@ -111,7 +113,7 @@ public class Master
             for (int i = 0; i < matrixA.getSize(); i++)
             {
                 MatrixAdditionDataChunk chunk = new MatrixAdditionDataChunk(matrixA.getRow(i), matrixB.getRow(i), i,
-                        key);
+                        matrixA.getSize());
                 SendMessageRequest smr = new SendMessageRequest(dataQueueURL, chunk.toString());
                 sqsClient.sendMessage(smr);
                 
@@ -134,11 +136,52 @@ public class Master
                     + "being able to access the network.");
             System.out.println("Error Message: " + ace.getMessage());
         }
-        receiveResults();
+
+        receiveMatrixAdditionResults();
 
     }
     
-    private void receiveResults()
+    public void matrixMultiplication()
+    {
+        time = System.currentTimeMillis();
+        
+        try
+        {
+            
+            for (int i = 0; i < matrixA.getSize(); i++)
+            {
+                for (int j = 0; i < matrixA.getSize(); j++)
+                {
+                    MatrixMultiplicationDataChunk chunk = new MatrixMultiplicationDataChunk(matrixA.getRow(i),
+                            matrixB.getColumn(j), i, j, matrixA.getSize());
+                    SendMessageRequest smr = new SendMessageRequest(dataQueueURL, chunk.toString());
+                    sqsClient.sendMessage(smr);
+                }
+                
+            }
+        }
+        catch (AmazonServiceException ase)
+        {
+            System.out.println("Caught an AmazonServiceException, which means your request made it "
+                    + "to Amazon SQS, but was rejected with an error response for some reason.");
+            System.out.println("Error Message:        " + ase.getMessage());
+            System.out.println("HTTP Status Code: " + ase.getStatusCode());
+            System.out.println("AWS Error Code:   " + ase.getErrorCode());
+            System.out.println("Error Type:           " + ase.getErrorType());
+            System.out.println("Request ID:           " + ase.getRequestId());
+        }
+        catch (AmazonClientException ace)
+        {
+            System.out.println("Caught an AmazonClientException, which means the client encountered "
+                    + "a serious internal problem while trying to communicate with SQS, such as not "
+                    + "being able to access the network.");
+            System.out.println("Error Message: " + ace.getMessage());
+        }
+
+        receiveMatrixAdditionResults();
+    }
+
+    private void receiveMatrixAdditionResults()
     {
         try
         {
@@ -176,13 +219,62 @@ public class Master
         }
         finally
         {
-            System.out.println("Time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+            System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
+                    + " matrix addition time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time))
+                    + " ms");
             // matrixA.print();
             // matrixB.print();
             // matrixResult.print();
         }
     }
     
+    private void receiveMatrixMultiplicationResults()
+    {
+        // try
+        // {
+        // do
+        // {
+        // ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
+        // rmr.setMaxNumberOfMessages(1);
+        //
+        // ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+        // List<Message> messages = result.getMessages();
+        //
+        // if (messages.size() > 0)
+        // {
+        // Message m = messages.get(0);
+        // String data = m.getBody();
+        // matrixResult.setValue(i, j, value) (getRow(data), getRowIndex(data));
+        //
+        // DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
+        // sqsClient.deleteMessage(delMes);
+        //
+        // rowReceived();
+        // }
+        //
+        // Thread.sleep(WAIT_IN_MS);
+        //
+        // } while (getIteration() > 0);
+        //
+        // SendMessageRequest smr = new SendMessageRequest(dataQueueURL, "END");
+        // sqsClient.sendMessage(smr);
+        //
+        // }
+        // catch (InterruptedException e)
+        // {
+        // e.printStackTrace();
+        // }
+        // finally
+        // {
+        // System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
+        // + " matrix addition time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time))
+        // + " ms");
+        // // matrixA.print();
+        // // matrixB.print();
+        // // matrixResult.print();
+        // }
+    }
+
     public void removeQueue(String name)
     {
         CreateQueueRequest c = new CreateQueueRequest(name);
@@ -226,6 +318,10 @@ public class Master
         return iterations;
     }
     
+    public boolean validate(Matrix m)
+    {
+        return matrixResult.equals(m);
+    }
     
 
 }

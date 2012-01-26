@@ -27,25 +27,12 @@ public class MatrixAdditionDataChunk extends MatrixDataChunk
         String result = "";
 
         result += rowIndex.intValue() + separator;
-        result += rowA.length + separator;
-        result += getRowData(rowA);
-        result += getRowData(rowB);
+        result += size + separator;
+        result += getData(rowA);
+        result += getData(rowB);
 
         return result;
 
     }
     
-    public String getRowData(Integer[] row)
-    {
-        String result = "";
-        for (int i = 0; i < row.length; i++)
-        {
-            result += row[i] + separator;
-        }
-        
-        return result;
-        
-    }
-
-
 }
