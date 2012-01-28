@@ -7,8 +7,8 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
-import uk.ac.cranfield.cloudcomputing.assignment.common.Matrix;
-import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixAdditionDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixAdditionDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.master.Master;
 import uk.ac.cranfield.cloudcomputing.assignment.worker.Worker;
 

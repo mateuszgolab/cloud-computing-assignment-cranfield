@@ -21,6 +21,9 @@ public class MainWorker
         Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
 
         Worker w = new Worker();
+        // Receive data from matrix B at first
+        // receive()
+
         w.connectQueues(DATA_QUEUE, RESULT_QUEUE);
         w.receive();
         
