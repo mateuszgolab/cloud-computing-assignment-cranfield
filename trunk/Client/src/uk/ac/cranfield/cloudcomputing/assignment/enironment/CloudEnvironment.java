@@ -8,7 +8,7 @@ import java.util.List;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.PropertiesCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
@@ -26,7 +26,7 @@ import com.amazonaws.services.ec2.model.RunInstancesResult;
 import com.amazonaws.services.ec2.model.Tag;
 
 
-public class EnvironmentSetter
+public class CloudEnvironment
 {
     
     private AmazonEC2 clientEC2;
@@ -34,36 +34,25 @@ public class EnvironmentSetter
     private List<String> securityGroupIds;
     private KeyPair keyPair;
     
-    public static String GROUP = "matGroup";
-    public static String SECURITY_GROUP = "matSecurityGroup";
-    public static String SECURITY_GROUP_DESCRIPTION = "Mat's security group";
-    public static String ENDPOINT_ZONE = "https://eu-west-1.ec2.amazonaws.com";
-    public static String KEY_PAIR_NAME = "matKeyPair";
-    public static final String LINUX_32_AMI = "ami-973b06e3";
+    
+    public static final String GROUP = "matGroup";
+    public static final String SECURITY_GROUP = "matSecurityGroup";
+    public static final String SECURITY_GROUP_DESCRIPTION = "Mat's security group";
+    public static final String ENDPOINT_ZONE = "https://eu-west-1.ec2.amazonaws.com";
+    public static final String KEY_PAIR_NAME = "matKeyPair";
     public static final String SECURITY_GROUP_ID = "sg-3cd83a4b";
     public static final String PROTOCOL = "tcp";
     public static final Integer SSH_PORT = 22;
     public static final String CRANFIELD_SUBNET = "138.250.0.0/16";
     
+    private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
+    private static final String secretAccessKey = "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";
     
-    public EnvironmentSetter()
+    public CloudEnvironment()
     {
-        credentials = null;
-        clientEC2 = null;
-        try
-        {
-            credentials = new PropertiesCredentials(
-                    EnvironmentSetter.class.getResourceAsStream("AwsCredentials.properties"));
-            
-            clientEC2 = new AmazonEC2Client(credentials);
-            clientEC2.setEndpoint(ENDPOINT_ZONE);
-        }
-        catch (IOException e1)
-        {
-            System.out.println("Credentials were not properly entered into AwsCredentials.properties.");
-            System.out.println(e1.getMessage());
-            System.exit(-1);
-        }
+        credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+        clientEC2 = new AmazonEC2Client(credentials);
+        clientEC2.setEndpoint(ENDPOINT_ZONE);
     }
     
     public void createSecurityGroup()
@@ -128,11 +117,11 @@ public class EnvironmentSetter
         
     }
     
-    public void createInstances(Integer number, List<String> names)
+    public void createInstances(Integer number, List<String> names, String image)
     {
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
         runInstancesRequest.setInstanceType(InstanceType.T1Micro);
-        runInstancesRequest.setImageId(LINUX_32_AMI);
+        runInstancesRequest.setImageId(image);
         runInstancesRequest.setKeyName(KEY_PAIR_NAME);
         runInstancesRequest.setMinCount(Integer.valueOf(1));
         runInstancesRequest.setMaxCount(number);
@@ -162,17 +151,13 @@ public class EnvironmentSetter
                 i++;
             }
         }
-        
-        // IpPermission ipPermission = new IpPermission();
-        // ipPermission.withIpRanges("111.111.111.111/32", "150.150.150.150/32").withIpProtocol("tcp").withToPort(3306)
-        // .withFromPort(3306);
     }
     
-    public void createInstance(String name)
+    public void createInstance(String name, String image)
     {
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
         runInstancesRequest.setInstanceType(InstanceType.T1Micro);
-        runInstancesRequest.setImageId(LINUX_32_AMI);
+        runInstancesRequest.setImageId(image);
         runInstancesRequest.setKeyName(KEY_PAIR_NAME);
         runInstancesRequest.setMinCount(1);
         runInstancesRequest.setMaxCount(1);
@@ -197,5 +182,6 @@ public class EnvironmentSetter
         }
         
     }
+    
     
 }

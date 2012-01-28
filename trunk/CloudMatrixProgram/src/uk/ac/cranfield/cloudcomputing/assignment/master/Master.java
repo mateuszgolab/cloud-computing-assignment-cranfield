@@ -2,9 +2,9 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 
 import java.util.List;
 
-import uk.ac.cranfield.cloudcomputing.assignment.common.Matrix;
-import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixAdditionDataChunk;
-import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixMultiplicationDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixAdditionDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixMultiplicationDataChunk;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -46,12 +46,7 @@ public class Master
     {
         iterations = 0;
         numberOfWorkers = workers;
-        credentials = null;
-        sqsClient = null;
         credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
-        
-        sqsClient = new AmazonSQSClient(credentials);
-        sqsClient.setEndpoint(ENDPOINT_ZONE);
         
         sqsClient = new AmazonSQSClient(credentials);
         sqsClient.setEndpoint(ENDPOINT_ZONE);

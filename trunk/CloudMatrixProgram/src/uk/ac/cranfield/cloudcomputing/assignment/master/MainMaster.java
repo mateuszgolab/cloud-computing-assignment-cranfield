@@ -3,7 +3,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import uk.ac.cranfield.cloudcomputing.assignment.common.Matrix;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
+
 
 
 
@@ -26,6 +27,9 @@ public class MainMaster
         Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
 
         
+        // Receive data from matrix A at first
+        // receive();
+
         matrixA = new Matrix(N);
         matrixA.generateRandomValues(KEY);
         matrixB = new Matrix(N);

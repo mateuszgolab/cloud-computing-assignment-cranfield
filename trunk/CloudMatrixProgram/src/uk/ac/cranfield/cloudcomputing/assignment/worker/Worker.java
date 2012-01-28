@@ -2,7 +2,7 @@ package uk.ac.cranfield.cloudcomputing.assignment.worker;
 
 import java.util.List;
 
-import uk.ac.cranfield.cloudcomputing.assignment.common.MatrixAdditionDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixAdditionDataChunk;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
