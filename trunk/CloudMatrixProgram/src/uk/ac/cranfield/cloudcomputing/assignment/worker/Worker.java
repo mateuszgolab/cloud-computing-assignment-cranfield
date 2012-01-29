@@ -2,7 +2,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.worker;
 
 import java.util.List;
 
-import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixAdditionDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDoubleDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -29,26 +30,30 @@ public class Worker
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     private String dataQueueURL;
     private String resultQueueURL;
+    private String workerQueueURL;
+    private String dataQueue;
+    private String resultQueue;
+    private String workerQueue;
     public static final Integer NUMBER_OF_ITERATIONS = 100;
     private Integer iterations;
     public static final Integer WAIT_IN_MS = 1;
     private long time;
     
     
-    public Worker()
+    public Worker(String dataQueue, String resultQueue, String workerQueue)
     {
-        credentials = null;
-        sqsClient = null;
+        this.dataQueue = dataQueue;
+        this.resultQueue = resultQueue;
+        this.workerQueue = workerQueue;
+
         credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
         
         sqsClient = new AmazonSQSClient(credentials);
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
-        sqsClient = new AmazonSQSClient(credentials);
-        sqsClient.setEndpoint(ENDPOINT_ZONE);
     }
     
-    public void connectQueues(String dataQueue, String resultQueue)
+    public void connectQueues()
     {
         
         try
@@ -61,6 +66,9 @@ public class Worker
             queueResult = sqsClient.createQueue(c);
             resultQueueURL = queueResult.getQueueUrl();
             
+            c = new CreateQueueRequest(workerQueue);
+            queueResult = sqsClient.createQueue(c);
+            workerQueueURL = queueResult.getQueueUrl();
             
         }
         catch (AmazonServiceException ase)
@@ -84,7 +92,7 @@ public class Worker
     }
     
     
-    public void receive()
+    public void receivee()
     {
         try
         {
@@ -139,7 +147,7 @@ public class Worker
     public String processDataAddition(Message m)
     {
         String data = m.getBody();
-        String[] values = data.split(MatrixAdditionDataChunk.separator);
+        String[] values = data.split(MatrixDoubleDataChunk.separator);
         String result = "";
         
         Integer size = Integer.parseInt(values[1]);
@@ -147,13 +155,13 @@ public class Worker
         Integer tmp = 0;
         
         for (j = 0; j < 2; j++)
-            result += values[j] + MatrixAdditionDataChunk.separator;
+            result += values[j] + MatrixDoubleDataChunk.separator;
         
         
         for (int i = 0; i < size; i++)
         {
             tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
-            result += tmp.toString() + MatrixAdditionDataChunk.separator;
+            result += tmp.toString() + MatrixDoubleDataChunk.separator;
         }
         
         return result;
@@ -164,7 +172,7 @@ public class Worker
     public String processDataMultiplication(Message m)
     {
         String data = m.getBody();
-        String[] values = data.split(MatrixAdditionDataChunk.separator);
+        String[] values = data.split(MatrixDoubleDataChunk.separator);
         String result = "";
         
         Integer size = Integer.parseInt(values[1]);
@@ -172,18 +180,67 @@ public class Worker
         Integer tmp = 0;
         
         for (j = 0; j < 2; j++)
-            result += values[j] + MatrixAdditionDataChunk.separator;
+            result += values[j] + MatrixDoubleDataChunk.separator;
         
         
         for (int i = 0; i < size; i++)
         {
             tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
-            result += tmp.toString() + MatrixAdditionDataChunk.separator;
+            result += tmp.toString() + MatrixDoubleDataChunk.separator;
         }
         
         return result;
         
         
+    }
+    
+    public Operation receiveStartingMessage()
+    {
+        ReceiveMessageRequest request = new ReceiveMessageRequest(dataQueue);
+        request.setMaxNumberOfMessages(1);
+        ReceiveMessageResult result = null;
+        List<Message> messages = null;
+        
+        try
+        {
+            
+            do
+            {
+                result = sqsClient.receiveMessage(request);
+                messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    String value = messages.get(0).getBody();
+                    if (Operation.ADDITION.toString().compareTo(value) == 0)
+                    {
+                        return Operation.ADDITION;
+                    }
+                    else if (Operation.MULTIPLICATION.toString().compareTo(value) == 0)
+                    {
+                        return Operation.MULTIPLICATION;
+                    }
+                    else if (Operation.END.toString().compareTo(value) == 0)
+                    {
+                        return Operation.END;
+                    }
+                }
+                Thread.sleep(1);
+                
+            } while (true);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+            return Operation.END;
+        }
+    }
+
+
+    public void send(String s)
+    {
+        SendMessageRequest smr = new SendMessageRequest(dataQueueURL, s);
+        sqsClient.sendMessage(smr);
     }
 
 
