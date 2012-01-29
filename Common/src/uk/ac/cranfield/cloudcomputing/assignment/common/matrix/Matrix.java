@@ -5,6 +5,8 @@ import java.util.Random;
 
 public class Matrix
 {
+    
+    
     private Integer[][] matrix;
     private Integer size;
     
@@ -25,20 +27,19 @@ public class Matrix
                 matrix[i][j] = random.nextInt(key);
             }
         }
-        
     }
     
     public void setRow(Integer[] row, Integer rowIndex)
     {
         if (row.length < size)
             return;
-
+        
         for (int i = 0; i < size; i++)
         {
             matrix[rowIndex][i] = row[i];
         }
     }
-
+    
     public void print()
     {
         for (int i = 0; i < size; i++)
@@ -55,8 +56,9 @@ public class Matrix
     public Matrix add(Matrix m)
     {
         long time = System.currentTimeMillis();
-
-        if(m.getSize() != size) return null;
+        
+        if (m.getSize() != size)
+            return null;
         
         Matrix result = new Matrix(size);
         
@@ -70,7 +72,7 @@ public class Matrix
         
         System.out.println("Sequential " + size + " x " + size + " matrix addition time elapsed : "
                 + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
-
+        
         return result;
     }
     
@@ -101,7 +103,7 @@ public class Matrix
         
         return result;
     }
-
+    
     public Integer getSize()
     {
         return size;
@@ -120,26 +122,28 @@ public class Matrix
     @Override
     public boolean equals(Object obj)
     {
-        if(!(obj instanceof Matrix)) return false;
+        if (!(obj instanceof Matrix))
+            return false;
         Matrix m = (Matrix) obj;
-        if(size != m.getSize()) return false;
+        if (size != m.getSize())
+            return false;
         
-        for(int i = 0; i < size; i++)
+        for (int i = 0; i < size; i++)
         {
-            for(int j = 0; j < size; j++)
+            for (int j = 0; j < size; j++)
             {
                 if (matrix[i][j] != m.getValue(i, j))
                     return false;
             }
         }
-       
+        
         return true;
     }
     
     public Integer[] getRow(Integer rowIndex)
     {
         Integer[] row = new Integer[size];
-
+        
         for (int i = 0; i < size; i++)
         {
             row[i] = matrix[rowIndex][i];

@@ -1,38 +1,35 @@
-package uk.ac.cranfield.cloudcomputing.assignment.matrix;
+package uk.ac.cranfield.cloudcomputing.assignment.master;
 
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
-import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixRowDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 
 
-public class MatrixUploaderThread extends Thread
+public class MatrixDataUploader extends Thread
 {
     
     private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
     private static final String secretAccessKey = "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";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     
-    private Matrix matrix;
-    private String queueURL;
+    protected String queueURL;
     private String queueName;
-    private AmazonSQSClient sqsClient;
+    protected AmazonSQSClient sqsClient;
     private AWSCredentials credentials;
+    protected Matrix matrix;
     
-    public MatrixUploaderThread(Integer size, Integer key, String queueName)
+    public MatrixDataUploader(Matrix matrix, String queueName, AWSCredentials credentials)
     {
-        matrix = new Matrix(size);
-        matrix.generateRandomValues(key);
         this.queueName = queueName;
-        
-        credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+        this.credentials = credentials;
+        this.matrix = matrix;
         
         sqsClient = new AmazonSQSClient(credentials);
         sqsClient.setEndpoint(ENDPOINT_ZONE);
@@ -72,12 +69,10 @@ public class MatrixUploaderThread extends Thread
     {
         for (int i = 0; i < matrix.getSize(); i++)
         {
-            MatrixRowDataChunk chunk = new MatrixRowDataChunk(i, matrix.getSize(), matrix.getRow(i));
+            MatrixDataChunk chunk = new MatrixDataChunk(i, matrix.getSize(), matrix.getRow(i));
             SendMessageRequest smr = new SendMessageRequest(queueURL, chunk.toString());
             sqsClient.sendMessage(smr);
-            
         }
-        
     }
     
 }
