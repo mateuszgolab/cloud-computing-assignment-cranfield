@@ -68,4 +68,9 @@ public class MatrixDataChunk
     {
         return data;
     }
+    
+    public Integer getSize()
+    {
+        return size;
+    }
 }

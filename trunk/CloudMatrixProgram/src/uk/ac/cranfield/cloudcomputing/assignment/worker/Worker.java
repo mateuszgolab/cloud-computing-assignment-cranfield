@@ -2,6 +2,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.worker;
 
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDoubleDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
@@ -25,19 +27,19 @@ public class Worker
     
     private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
     private static final String secretAccessKey = "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";
+    public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
+    public static final Integer WAIT_IN_MS = 1;
     private AmazonSQSClient sqsClient;
     private AWSCredentials credentials;
-    public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     private String dataQueueURL;
     private String resultQueueURL;
     private String workerQueueURL;
     private String dataQueue;
     private String resultQueue;
     private String workerQueue;
-    public static final Integer NUMBER_OF_ITERATIONS = 100;
-    private Integer iterations;
-    public static final Integer WAIT_IN_MS = 1;
-    private long time;
+    private Message firstMessage;
+    private Matrix matrixB;
+    private Integer rowsToReceive;
     
     
     public Worker(String dataQueue, String resultQueue, String workerQueue)
@@ -53,7 +55,7 @@ public class Worker
         
     }
     
-    public void connectQueues()
+    public void connectQueues() throws AmazonServiceException
     {
         
         try
@@ -71,16 +73,6 @@ public class Worker
             workerQueueURL = queueResult.getQueueUrl();
             
         }
-        catch (AmazonServiceException ase)
-        {
-            System.out.println("Caught an AmazonServiceException, which means your request made it "
-                    + "to Amazon SQS, but was rejected with an error response for some reason.");
-            System.out.println("Error Message:        " + ase.getMessage());
-            System.out.println("HTTP Status Code: " + ase.getStatusCode());
-            System.out.println("AWS Error Code:   " + ase.getErrorCode());
-            System.out.println("Error Type:           " + ase.getErrorType());
-            System.out.println("Request ID:           " + ase.getRequestId());
-        }
         catch (AmazonClientException ace)
         {
             System.out.println("Caught an AmazonClientException, which means the client encountered "
@@ -91,37 +83,156 @@ public class Worker
         
     }
     
-    
-    public void receivee()
+    public void removeWorkerQueue()
     {
+        DeleteQueueRequest del = new DeleteQueueRequest(workerQueueURL);
+        sqsClient.deleteQueue(del);
+    }
+    
+    public String processDataAddition(MatrixDoubleDataChunk chunk)
+    {
+        Integer[] rowA = chunk.getMatrixRow();
+        Integer[] rowB = chunk.getMatrixBRow();
+        
+        for (int i = 0; i < chunk.getSize(); i++)
+        {
+            rowA[i] += rowB[i];
+        }
+        
+        MatrixDataChunk resultChunk = new MatrixDataChunk(chunk.getRowIndex(), chunk.getSize(), rowA);
+        
+        return resultChunk.toString();
+    }
+    
+    public String processDataMultiplication(MatrixDataChunk chunk)
+    {
+        Integer[] row = chunk.getMatrixRow();
+        Integer[] resultRow = new Integer[chunk.getSize()];
+        
+        for (int j = 0; j < chunk.getSize(); j++)
+        {
+            for (int i = 0; i < chunk.getSize(); i++)
+            {
+                resultRow[j] += row[i] * matrixB.getValue(i, j);
+            }
+        }
+        
+        MatrixDataChunk resultChunk = new MatrixDataChunk(chunk.getRowIndex(), chunk.getSize(), resultRow);
+        
+        return resultChunk.toString();
+        
+    }
+    
+    public Operation receiveStartingMessage() throws AmazonServiceException
+    {
+        ReceiveMessageRequest additionRequest = new ReceiveMessageRequest(dataQueueURL);
+        additionRequest.setMaxNumberOfMessages(1);
+        
+        ReceiveMessageRequest multiplicationRequest = new ReceiveMessageRequest(workerQueueURL);
+        multiplicationRequest.setMaxNumberOfMessages(1);
+
+        ReceiveMessageResult result = null;
+        List<Message> messages = null;
+        
         try
         {
+            
             do
             {
-                ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
-                rmr.setMaxNumberOfMessages(1);
+                result = sqsClient.receiveMessage(additionRequest);
+                messages = result.getMessages();
                 
-                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
-                List<Message> messages = result.getMessages();
+                if (messages.size() > 0)
+                {
+                    firstMessage = messages.get(0);
+                    if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+                    {
+                        deleteMessage(dataQueueURL, firstMessage);
+                        return Operation.END_PROGRAM;
+                    }
+                    return Operation.ADDITION;
+                }
+                
+                result = sqsClient.receiveMessage(multiplicationRequest);
+                messages = result.getMessages();
 
                 if (messages.size() > 0)
                 {
-                    Message m = messages.get(0);
-                    
-                    if ("END".compareToIgnoreCase(m.getBody()) == 0)
+                    firstMessage = messages.get(0);
+                    return Operation.MULTIPLICATION;
+                }
+
+                Thread.sleep(1);
+                
+            } while (true);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+            return Operation.END_PROGRAM;
+        }
+    }
+    
+    private void deleteMessage(String queueURL, Message m)
+    {
+        DeleteMessageRequest delMes = new DeleteMessageRequest(queueURL, m.getReceiptHandle());
+        sqsClient.deleteMessage(delMes);
+    }
+
+    public void matrixAddition()
+    {
+        try
+        {
+            
+            if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+            {
+                deleteMessage(dataQueueURL, firstMessage);
+                return;
+            }
+            else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+            {
+                deleteMessage(dataQueueURL, firstMessage);
+                System.exit(0);
+            }
+            
+            MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(firstMessage.getBody());
+            String res = processDataAddition(chunk);
+            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
+            sqsClient.sendMessage(smr);
+            
+            deleteMessage(dataQueueURL, firstMessage);
+
+
+            do
+            {
+                ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
+                rmr.setMaxNumberOfMessages(10);
+                
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    for (Message m : messages)
                     {
-                        DeleteMessageRequest delMes = new DeleteMessageRequest(dataQueueURL, m.getReceiptHandle());
-                        sqsClient.deleteMessage(delMes);
-                        return;
+                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // return;
+                        // }
+                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // System.exit(0);
+                        // }
+
+                        chunk = new MatrixDoubleDataChunk(m.getBody());
+                        res = processDataAddition(chunk);
+                        smr = new SendMessageRequest(resultQueueURL, res);
+                        sqsClient.sendMessage(smr);
+
+                        deleteMessage(dataQueueURL, m);
                     }
-                    
-                    // System.out.println("Received : " + m.getBody());
-                    String res = processDataAddition(m);
-                    SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
-                    sqsClient.sendMessage(smr);
-                    
-                    DeleteMessageRequest delMes = new DeleteMessageRequest(dataQueueURL, m.getReceiptHandle());
-                    sqsClient.deleteMessage(delMes);
                 }
                 Thread.sleep(WAIT_IN_MS);
                 
@@ -134,114 +245,111 @@ public class Worker
         }
     }
     
-    public void removeQueue(String name)
+    public void matrixMultiplication()
     {
-        CreateQueueRequest c = new CreateQueueRequest(name);
-        CreateQueueResult queueResult = sqsClient.createQueue(c);
-        DeleteQueueRequest del = new DeleteQueueRequest(queueResult.getQueueUrl());
-        sqsClient.deleteQueue(del);
-        
-    }
-    
-    
-    public String processDataAddition(Message m)
-    {
-        String data = m.getBody();
-        String[] values = data.split(MatrixDoubleDataChunk.separator);
-        String result = "";
-        
-        Integer size = Integer.parseInt(values[1]);
-        Integer j = 0;
-        Integer tmp = 0;
-        
-        for (j = 0; j < 2; j++)
-            result += values[j] + MatrixDoubleDataChunk.separator;
-        
-        
-        for (int i = 0; i < size; i++)
-        {
-            tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
-            result += tmp.toString() + MatrixDoubleDataChunk.separator;
-        }
-        
-        return result;
-        
-        
-    }
-    
-    public String processDataMultiplication(Message m)
-    {
-        String data = m.getBody();
-        String[] values = data.split(MatrixDoubleDataChunk.separator);
-        String result = "";
-        
-        Integer size = Integer.parseInt(values[1]);
-        Integer j = 0;
-        Integer tmp = 0;
-        
-        for (j = 0; j < 2; j++)
-            result += values[j] + MatrixDoubleDataChunk.separator;
-        
-        
-        for (int i = 0; i < size; i++)
-        {
-            tmp = Integer.parseInt(values[i + j]) + Integer.parseInt(values[i + j + size]);
-            result += tmp.toString() + MatrixDoubleDataChunk.separator;
-        }
-        
-        return result;
-        
-        
-    }
-    
-    public Operation receiveStartingMessage()
-    {
-        ReceiveMessageRequest request = new ReceiveMessageRequest(dataQueue);
-        request.setMaxNumberOfMessages(1);
-        ReceiveMessageResult result = null;
-        List<Message> messages = null;
-        
         try
         {
+
+            if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+            {
+                deleteMessage(workerQueueURL, firstMessage);
+                return;
+            }
+            else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+            {
+                deleteMessage(workerQueueURL, firstMessage);
+                System.exit(0);
+            }
+            
+            MatrixDataChunk chunk = new MatrixDataChunk(firstMessage.getBody());
+            matrixB = new Matrix(chunk.getSize());
+            rowsToReceive = chunk.getSize() - 1;
+            matrixB.setRow(chunk.getMatrixRow(), chunk.getRowIndex());
+            
+            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, Operation.RECEPTION.toString());
+            sqsClient.sendMessage(smr);
+
+            deleteMessage(workerQueueURL, firstMessage);
             
             do
             {
-                result = sqsClient.receiveMessage(request);
-                messages = result.getMessages();
+                ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
+                rmr.setMaxNumberOfMessages(10);
+                
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
-                    String value = messages.get(0).getBody();
-                    if (Operation.ADDITION.toString().compareTo(value) == 0)
+                    for (Message m : messages)
                     {
-                        return Operation.ADDITION;
-                    }
-                    else if (Operation.MULTIPLICATION.toString().compareTo(value) == 0)
-                    {
-                        return Operation.MULTIPLICATION;
-                    }
-                    else if (Operation.END.toString().compareTo(value) == 0)
-                    {
-                        return Operation.END;
+                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // return;
+                        // }
+                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // System.exit(0);
+                        // }
+                        
+                        chunk = new MatrixDataChunk(m.getBody());
+                        matrixB.setRow(chunk.getMatrixRow(), chunk.getRowIndex());
+                        deleteMessage(workerQueueURL, m);
+                        rowsToReceive--;
                     }
                 }
-                Thread.sleep(1);
+                Thread.sleep(WAIT_IN_MS);
+                
+            } while (rowsToReceive > 0);
+
+            
+            do
+            {
+                ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
+                rmr.setMaxNumberOfMessages(10);
+                
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    for (Message m : messages)
+                    {
+                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // return;
+                        // }
+                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        // {
+                        // deleteMessage(dataQueueURL, m);
+                        // System.exit(0);
+                        // }
+                        
+                        chunk = new MatrixDataChunk(m.getBody());
+                        String res = processDataMultiplication(chunk);
+                        smr = new SendMessageRequest(resultQueueURL, res);
+                        sqsClient.sendMessage(smr);
+
+                        deleteMessage(dataQueueURL, m);
+                    }
+                }
+                Thread.sleep(WAIT_IN_MS);
                 
             } while (true);
+            
         }
         catch (InterruptedException e)
         {
             e.printStackTrace();
-            return Operation.END;
         }
     }
-
-
-    public void send(String s)
+    
+    public Message getFirstMessage()
     {
-        SendMessageRequest smr = new SendMessageRequest(dataQueueURL, s);
-        sqsClient.sendMessage(smr);
+        return firstMessage;
     }
-
 
 }
