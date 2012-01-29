@@ -24,7 +24,7 @@ public class Matrix
         {
             for (int j = 0; j < size; j++)
             {
-                matrix[i][j] = random.nextInt(key);
+                matrix[i][j] = 1 + random.nextInt(key - 1);
             }
         }
     }
@@ -70,9 +70,9 @@ public class Matrix
             }
         }
         
-        System.out.println("Sequential " + size + " x " + size + " matrix addition time elapsed : "
-                + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
-        
+        // System.out.println("Sequential " + size + " x " + size + " matrix addition time elapsed : "
+        // + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+        //
         return result;
     }
     
@@ -98,8 +98,8 @@ public class Matrix
             }
         }
         
-        System.out.println("Sequential " + size + " x " + size + " matrix multiplication time elapsed : "
-                + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
+        // System.out.println("Sequential " + size + " x " + size + " matrix multiplication time elapsed : "
+        // + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
         
         return result;
     }

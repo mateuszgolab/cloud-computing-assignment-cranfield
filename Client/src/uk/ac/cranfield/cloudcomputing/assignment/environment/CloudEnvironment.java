@@ -28,12 +28,6 @@ import com.amazonaws.services.ec2.model.Tag;
 public class CloudEnvironment
 {
     
-    private AmazonEC2 clientEC2;
-    private AWSCredentials credentials;
-    private List<String> securityGroupIds;
-    private KeyPair keyPair;
-    
-    
     public static final String GROUP = "matGroup";
     public static final String SECURITY_GROUP = "matSecurityGroup";
     public static final String SECURITY_GROUP_DESCRIPTION = "Mat's security group";
@@ -43,11 +37,17 @@ public class CloudEnvironment
     public static final String PROTOCOL = "tcp";
     public static final Integer SSH_PORT = 22;
     public static final String CRANFIELD_SUBNET = "138.250.0.0/16";
+    private AmazonEC2 clientEC2;
+    private AWSCredentials credentials;
+    private List<String> securityGroupIds;
+    private KeyPair keyPair;
+    private List<String> workerQueuesNames;
     
     
     public CloudEnvironment(AWSCredentials credentials)
     {
         this.credentials = credentials;
+        workerQueuesNames = new ArrayList<String>();
         clientEC2 = new AmazonEC2Client(credentials);
         clientEC2.setEndpoint(ENDPOINT_ZONE);
     }
@@ -114,7 +114,7 @@ public class CloudEnvironment
         
     }
     
-    public void createInstances(Integer number, List<String> names, String image)
+    public void createInstances(Integer number, String name, String image)
     {
         RunInstancesRequest runInstancesRequest = new RunInstancesRequest();
         runInstancesRequest.setInstanceType(InstanceType.T1Micro);
@@ -137,17 +137,13 @@ public class CloudEnvironment
         List<Instance> ins = runResult.getReservation().getInstances();
         
         
-        if (names != null)
+        for (Instance instance : ins)
         {
-            int i = 0;
-            for (Instance instance : ins)
-            {
-                CreateTagsRequest createTagsRequest = new CreateTagsRequest();
-                createTagsRequest.withResources(instance.getInstanceId()).withTags(new Tag("Name", names.get(i)));
-                clientEC2.createTags(createTagsRequest);
-                i++;
-            }
+            CreateTagsRequest createTagsRequest = new CreateTagsRequest();
+            createTagsRequest.withResources(instance.getInstanceId()).withTags(new Tag("Name", name));
+            clientEC2.createTags(createTagsRequest);
         }
+        
     }
     
     public void createInstance(String name, String image)
@@ -176,7 +172,13 @@ public class CloudEnvironment
             CreateTagsRequest createTagsRequest = new CreateTagsRequest();
             createTagsRequest.withResources(instance.getInstanceId()).withTags(new Tag("Name", name));
             clientEC2.createTags(createTagsRequest);
+            workerQueuesNames.add(instance.getInstanceId() + "workerQueue");
         }
+    }
+    
+    public List<String> getWorkerQueuesNames()
+    {
+        return workerQueuesNames;
     }
     
     

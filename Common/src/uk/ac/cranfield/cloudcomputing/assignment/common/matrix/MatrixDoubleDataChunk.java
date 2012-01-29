@@ -6,10 +6,10 @@ public class MatrixDoubleDataChunk extends MatrixDataChunk
     
     private Integer[] data2;
     
-    public MatrixDoubleDataChunk(Integer rowIndex, Integer size, Integer[] data, Integer[] data1)
+    public MatrixDoubleDataChunk(Integer rowIndex, Integer size, Integer[] data, Integer[] data2)
     {
         super(rowIndex, size, data);
-        this.data = data1;
+        this.data2 = data2;
         
     }
     
@@ -41,10 +41,16 @@ public class MatrixDoubleDataChunk extends MatrixDataChunk
         result += rowIndex.intValue() + separator;
         result += size + separator;
         result += getData(data);
+        result += separator;
         result += getData(data2);
         
         return result;
         
+    }
+    
+    public Integer[] getMatrixBRow()
+    {
+        return data2;
     }
     
 }
