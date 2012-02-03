@@ -9,7 +9,8 @@ import com.amazonaws.AmazonServiceException;
 public class Main
 {
     
-    public static final String DATA_QUEUE = "matDataQueue";
+    public static final String ADD_DATA_QUEUE = "matDataQueue";
+    public static final String MULTIPLY_DATA_QUEUE = "matDataQueue";
     public static final String RESULT_QUEUE = "matResultQueue";
     private static String workerQueue;
 
@@ -27,7 +28,7 @@ public class Main
         try
         {
             
-            Worker worker = new Worker(DATA_QUEUE, RESULT_QUEUE, workerQueue);
+            Worker worker = new Worker(MULTIPLY_DATA_QUEUE, RESULT_QUEUE, workerQueue);
             worker.connectQueues();
             
             while (true)
@@ -40,7 +41,7 @@ public class Main
                         worker.matrixMultiplication();
                         break;
                     case END_PROGRAM:
-                        worker.removeWorkerQueue();
+                        // worker.removeWorkerQueue();
                         return;
                 }
             }

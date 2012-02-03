@@ -32,16 +32,16 @@ public class Master
     private AWSCredentials credentials;
     private String dataQueueURL;
     private String resultQueueURL;
-    private Integer rowsReceived;
+    private int rowsReceived;
     private long time;
     private Matrix matrixA;
     private Matrix matrixB;
     private Matrix matrixResult;
-    private Integer key;
-    private Integer numberOfWorkers;
+    private int key;
+    private int numberOfWorkers;
     
     
-    public Master(Integer workers, Integer size)
+    public Master(int workers, int size)
     {
         rowsReceived = size;
         numberOfWorkers = workers;
@@ -50,18 +50,19 @@ public class Master
         
         sqsClient = new AmazonSQSClient(credentials);
         sqsClient.setEndpoint(ENDPOINT_ZONE);
+        
     }
     
-    public Master(Integer w, Matrix a, Matrix b, Integer k)
+    public Master(int workers, Matrix a, Matrix b, Integer k)
     {
-        this(w, a.getSize());
+        this(workers, a.getSize());
         matrixA = a;
         matrixB = b;
         matrixResult = new Matrix(a.getSize());
         key = k;
     }
     
-    public void connectQueues(String dataQueue, String resultQueue)
+    public void connectToQueues(String dataQueue, String resultQueue)
     {
         
         try
@@ -73,6 +74,19 @@ public class Master
             c = new CreateQueueRequest(resultQueue);
             queueResult = sqsClient.createQueue(c);
             resultQueueURL = queueResult.getQueueUrl();
+            
+            // String s = "";
+            // for (int i = 0; i < 64000; i++)
+            // {
+            // s += "7";
+            // }
+            //
+            //
+            // SendMessageRequest smr = new SendMessageRequest(dataQueueURL, s);
+            // System.out.println(s.getBytes("UTF-16").length);
+            // sqsClient.sendMessage(smr);
+            // System.out.println(s.getBytes("UTF-16").length);
+            // sqsClient.sendMessage(smr);
             
             
         }
@@ -135,24 +149,42 @@ public class Master
         
     }
     
-    public void matrixMultiplication()
+    public Matrix receiveResults()
     {
-        time = System.currentTimeMillis();
+        
+        ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
+        rmr.setMaxNumberOfMessages(10);
         
         try
         {
+            do
+            {
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    for (Message m : messages)
+                    {
+                        MatrixDataChunk receivedChunk = new MatrixDataChunk(m.getBody());
+                        matrixResult.setRows(receivedChunk.getMatrixRows(), receivedChunk.getRowIndex());
+                        
+                        DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
+                        sqsClient.deleteMessage(delMes);
+                    }
+                    
+                    rowReceived(messages.size());
+                }
+                
+                Thread.sleep(WAIT_IN_MS);
+                
+            } while (getMissingRowsNumber() > 0);
             
-            // for (int i = 0; i < matrixA.getSize(); i++)
-            // {
-            // for (int j = 0; i < matrixA.getSize(); j++)
-            // {
-            // MatrixMultiplicationDataChunk chunk = new MatrixMultiplicationDataChunk(matrixA.getRow(i),
-            // matrixB.getColumn(j), i, j, matrixA.getSize());
-            // SendMessageRequest smr = new SendMessageRequest(dataQueueURL, chunk.toString());
-            // sqsClient.sendMessage(smr);
-            // }
-            //
-            // }
+            for (int i = 0; i < numberOfWorkers; i++)
+            {
+                SendMessageRequest smr = new SendMessageRequest(dataQueueURL, Operation.END_CALCULATIONS.toString());
+                sqsClient.sendMessage(smr);
+            }
         }
         catch (AmazonServiceException ase)
         {
@@ -171,53 +203,6 @@ public class Master
                     + "being able to access the network.");
             System.out.println("Error Message: " + ace.getMessage());
         }
-        
-        // receiveData();
-    }
-    
-    public Matrix receiveResults()
-    {
-        
-        try
-        {
-            do
-            {
-                ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
-                rmr.setMaxNumberOfMessages(10);
-                
-                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
-                List<Message> messages = result.getMessages();
-                
-                if (messages.size() > 0)
-                {
-                    for (Message m : messages)
-                    {
-                        MatrixDataChunk receivedChunk = new MatrixDataChunk(m.getBody());
-                        matrixResult.setRow(receivedChunk.getMatrixRow(), receivedChunk.getRowIndex());
-                        
-                        DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
-                        sqsClient.deleteMessage(delMes);
-                        
-                        rowReceived();
-                    }
-                }
-                
-                Thread.sleep(WAIT_IN_MS);
-                
-            } while (getMissingRowsNumber() > 0);
-            
-            for (int i = 0; i < numberOfWorkers; i++)
-            {
-                SendMessageRequest smr = new SendMessageRequest(dataQueueURL, Operation.END_CALCULATIONS.toString());
-                sqsClient.sendMessage(smr);
-            }
-            
-            
-        }
-        catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
         finally
         {
             // System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
@@ -231,53 +216,6 @@ public class Master
         }
     }
     
-    private void receiveMatrixMultiplicationResults()
-    {
-        // try
-        // {
-        // do
-        // {
-        // ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
-        // rmr.setMaxNumberOfMessages(1);
-        //
-        // ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
-        // List<Message> messages = result.getMessages();
-        //
-        // if (messages.size() > 0)
-        // {
-        // Message m = messages.get(0);
-        // String data = m.getBody();
-        // matrixResult.setValue(i, j, value) (getRow(data), getRowIndex(data));
-        //
-        // DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
-        // sqsClient.deleteMessage(delMes);
-        //
-        // rowReceived();
-        // }
-        //
-        // Thread.sleep(WAIT_IN_MS);
-        //
-        // } while (getIteration() > 0);
-        //
-        // SendMessageRequest smr = new SendMessageRequest(dataQueueURL, "END");
-        // sqsClient.sendMessage(smr);
-        //
-        // }
-        // catch (InterruptedException e)
-        // {
-        // e.printStackTrace();
-        // }
-        // finally
-        // {
-        // System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
-        // + " matrix addition time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time))
-        // + " ms");
-        // // matrixA.print();
-        // // matrixB.print();
-        // // matrixResult.print();
-        // }
-    }
-    
     public void removeQueue(String name)
     {
         CreateQueueRequest c = new CreateQueueRequest(name);
@@ -287,12 +225,12 @@ public class Master
         
     }
     
-    private synchronized void rowReceived()
+    private synchronized void rowReceived(int rows)
     {
-        rowsReceived--;
+        rowsReceived -= rows;
     }
     
-    private synchronized Integer getMissingRowsNumber()
+    private synchronized int getMissingRowsNumber()
     {
         return rowsReceived;
     }
@@ -331,19 +269,31 @@ public class Master
         {
             SendMessageRequest smr = new SendMessageRequest(dataQueueURL, Operation.END_PROGRAM.toString());
             sqsClient.sendMessage(smr);
+            
+            
         }
     }
     
-    public boolean isMultiplicationNotificationReceived()
+    // public boolean isMultiplicationNotificationReceived()
+    // {
+    // ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
+    // ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+    // List<Message> messages = result.getMessages();
+    // boolean res = false;
+    //
+    // if (messages.size() > 0)
+    // {
+    // res = Operation.RECEPTION.toString().compareToIgnoreCase(messages.get(0).getBody()) == 0;
+    // DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, messages.get(0).getReceiptHandle());
+    // sqsClient.deleteMessage(delMes);
+    // }
+    // return res;
+    // }
+    
+    
+    public String getDataQueueURL()
     {
-        ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
-        ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
-        List<Message> messages = result.getMessages();
-        
-        if (messages.size() > 0)
-        {
-            return Operation.RECEPTION.toString().compareToIgnoreCase(messages.get(0).getBody()) == 0;
-        }
-        return false;
+        return dataQueueURL;
     }
+    
 }
