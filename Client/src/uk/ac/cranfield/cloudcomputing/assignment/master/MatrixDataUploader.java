@@ -1,5 +1,8 @@
 package uk.ac.cranfield.cloudcomputing.assignment.master;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 
@@ -12,37 +15,56 @@ import com.amazonaws.services.sqs.model.CreateQueueResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 
 
-public class MatrixDataUploader extends Thread
+public class MatrixDataUploader
 {
     
     private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
     private static final String secretAccessKey = "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";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     
-    protected String queueURL;
-    private String queueName;
+    protected List<String> queuesURLs;
+    private List<String> queuesNames;
     protected AmazonSQSClient sqsClient;
     private AWSCredentials credentials;
     protected Matrix matrix;
+    protected int numberOfDataBlocks;
     
-    public MatrixDataUploader(Matrix matrix, String queueName, AWSCredentials credentials)
+    public MatrixDataUploader(Matrix matrix, List<String> queues, AWSCredentials credentials, int numberOfDataBlocks)
     {
-        this.queueName = queueName;
+        this.numberOfDataBlocks = numberOfDataBlocks;
+        this.queuesNames = queues;
         this.credentials = credentials;
         this.matrix = matrix;
+        this.queuesURLs = new ArrayList<String>();
         
         sqsClient = new AmazonSQSClient(credentials);
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
     }
     
-    public void connectQueue()
+    public MatrixDataUploader(Matrix matrix, String queueURL, AWSCredentials credentials, int numberOfDataBlocks)
+    {
+        this.numberOfDataBlocks = numberOfDataBlocks;
+        this.credentials = credentials;
+        this.matrix = matrix;
+        this.queuesURLs = new ArrayList<String>();
+        this.queuesURLs.add(queueURL);
+        
+        sqsClient = new AmazonSQSClient(credentials);
+        sqsClient.setEndpoint(ENDPOINT_ZONE);
+        
+    }
+    
+    public void connectToQueue()
     {
         try
         {
-            CreateQueueRequest c = new CreateQueueRequest(queueName);
-            CreateQueueResult queueResult = sqsClient.createQueue(c);
-            queueURL = queueResult.getQueueUrl();
+            for (String q : queuesNames)
+            {
+                CreateQueueRequest c = new CreateQueueRequest(q);
+                CreateQueueResult queueResult = sqsClient.createQueue(c);
+                queuesURLs.add(queueResult.getQueueUrl());
+            }
             
         }
         catch (AmazonServiceException ase)
@@ -64,15 +86,19 @@ public class MatrixDataUploader extends Thread
         }
     }
     
-    @Override
-    public void run()
+    public void send()
     {
-        for (int i = 0; i < matrix.getSize(); i++)
+        List<MatrixDataChunk> chunks = matrix.decompose(numberOfDataBlocks);
+        
+        for (MatrixDataChunk chunk : chunks)
         {
-            MatrixDataChunk chunk = new MatrixDataChunk(i, matrix.getSize(), matrix.getRow(i));
-            SendMessageRequest smr = new SendMessageRequest(queueURL, chunk.toString());
-            sqsClient.sendMessage(smr);
+            String data = chunk.toString();
+            for (String queue : queuesURLs)
+            {
+                SendMessageRequest smr = new SendMessageRequest(queue, data);
+                sqsClient.sendMessage(smr);
+            }
         }
+        
     }
-    
 }

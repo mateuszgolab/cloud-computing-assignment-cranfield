@@ -26,6 +26,7 @@ public class Main
     public static final String LINUX_32_AMI = "ami-913b05e5";
     public static final Integer KEY = 10;
     public static final Integer SIZE = 100;
+    public static final int NUMBER_OF_DATA_BLOCKS = 32;
     public static List<String> workersQueues;
     
     private static Matrix matrixA;
@@ -54,8 +55,10 @@ public class Main
         
         numberOfWorkers = 1;
         master = new Master(numberOfWorkers, SIZE);
+        // master.clearQueue(workersQueues.get(0), 100);
         // master.clearQueue(DATA_QUEUE, 100);
-        master.connectQueues(DATA_QUEUE, RESULT_QUEUE);
+        // master.clearQueue(RESULT_QUEUE, 7);
+        master.connectToQueues(DATA_QUEUE, RESULT_QUEUE);
         
         generateMatrixes();
         
@@ -70,7 +73,8 @@ public class Main
         System.out.println("Distributed matrix addition : " + distTime + " ms");
         System.out.println("Local matrix addition : " + localTime + " ms");
         
-        // master.endProgram();
+        master.endProgram();
+        
         
     }
     
@@ -85,6 +89,7 @@ public class Main
     {
         long time = System.currentTimeMillis();
         matrixLocalResult = matrixA.multiply(matrixB);
+        // matrixLocalResult.print();
         return System.currentTimeMillis() - time;
         
     }
@@ -101,11 +106,10 @@ public class Main
     private static long distributedMatrixAddition()
     {
         long time = System.currentTimeMillis();
-        MatrixDoubleDataUploader doubleUploader = new MatrixDoubleDataUploader(matrixA, matrixB, DATA_QUEUE,
-                credentials);
-        doubleUploader.connectQueue();
-        doubleUploader.start();
-        matrixResult = master.receiveResults();
+        MatrixDoubleDataUploader doubleUploader = new MatrixDoubleDataUploader(matrixA, matrixB,
+                master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
+        doubleUploader.send();
+        // matrixResult = master.receiveResults();
         return System.currentTimeMillis() - time;
         
     }
@@ -113,34 +117,16 @@ public class Main
     private static long distributedMatrixMultiplication()
     {
         long time = System.currentTimeMillis();
-        MatrixDataUploader uploader = null;
-        Integer i = 0;
         
-        for (; i < numberOfWorkers; i++)
-        {
-            uploader = new MatrixDataUploader(matrixB, workersQueues.get(i), credentials);
-            uploader.connectQueue();
-            uploader.start();
-            
-            if (master.isMultiplicationNotificationReceived())
-                break;
-        }
+        MatrixDataUploader uploader = new MatrixDataUploader(matrixB, workersQueues, credentials, 1);
+        uploader.connectToQueue();
+        uploader.send();
         
-        
-        uploader = new MatrixDataUploader(matrixA, DATA_QUEUE, credentials);
-        uploader.connectQueue();
-        uploader.start();
-        i++;
-        
-        for (; i < numberOfWorkers; i++)
-        {
-            uploader = new MatrixDataUploader(matrixB, workersQueues.get(i), credentials);
-            uploader.connectQueue();
-            uploader.start();
-            
-        }
+        uploader = new MatrixDataUploader(matrixA, master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
+        uploader.send();
         
         matrixResult = master.receiveResults();
+        // matrixResult.print();
         return System.currentTimeMillis() - time;
     }
     

@@ -1,10 +1,12 @@
 package uk.ac.cranfield.cloudcomputing.assignment.worker;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDoubleDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixResultDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
 import com.amazonaws.AmazonClientException;
@@ -91,35 +93,83 @@ public class Worker
     
     public String processDataAddition(MatrixDoubleDataChunk chunk)
     {
-        Integer[] rowA = chunk.getMatrixRow();
-        Integer[] rowB = chunk.getMatrixBRow();
+        List<Integer[]> rowsA = chunk.getMatrixRows();
+        List<Integer[]> rowsB = chunk.getMatrixBRows();
+        List<Integer[]> resultRows = new ArrayList<Integer[]>();
         
-        for (int i = 0; i < chunk.getSize(); i++)
+        for (int i = 0; i < chunk.getNumberOfRows(); i++)
         {
-            rowA[i] += rowB[i];
+            Integer[] rowA = rowsA.get(i);
+            Integer[] rowB = rowsB.get(i);
+            
+            for (int j = 0; j < chunk.getSize(); j++)
+            {
+                rowA[j] += rowB[j];
+            }
+            
+            resultRows.add(rowA);
         }
         
-        MatrixDataChunk resultChunk = new MatrixDataChunk(chunk.getRowIndex(), chunk.getSize(), rowA);
-        
-        return resultChunk.toString();
+        return new MatrixResultDataChunk(chunk.getNumberOfRows(), chunk.getRowIndex(), chunk.getSize(), resultRows)
+                .toString();
     }
     
-    public String processDataMultiplication(MatrixDataChunk chunk)
+    public List<String> processDataMultiplication(MatrixDataChunk chunk)
     {
-        Integer[] row = chunk.getMatrixRow();
-        Integer[] resultRow = new Integer[chunk.getSize()];
+        List<Integer[]> rows = chunk.getMatrixRows();
+        List<Integer[]> allRowsResults = new ArrayList<Integer[]>();
         
-        for (int j = 0; j < chunk.getSize(); j++)
+        for (Integer[] row : rows)
         {
-            for (int i = 0; i < chunk.getSize(); i++)
+            Integer[] resultRow = new Integer[chunk.getSize()];
+            for (int i = 0; i < matrixB.getSize(); i++)
             {
-                resultRow[j] += row[i] * matrixB.getValue(i, j);
+                resultRow[i] = 0;
+                for (int j = 0; j < chunk.getSize(); j++)
+                {
+                    resultRow[i] += row[j] * matrixB.getValue(j, i);
+                }
+            }
+            
+            allRowsResults.add(resultRow);
+        }
+        
+        int totalResultSize = 0;
+        int rowsNumber = 0;
+        int rowIndex = 0;
+        List<Integer[]> rowsResult = new ArrayList<Integer[]>();
+        List<MatrixResultDataChunk> chunksResult = new ArrayList<MatrixResultDataChunk>();
+        
+        for(Integer[] in : allRowsResults)
+        {
+            int size = MatrixDataChunk.getRowLength(in);
+            
+            if(totalResultSize + size <= MatrixDataChunk.SIZE_LIMIT)
+            {
+                totalResultSize += size;
+                rowsNumber++;
+                rowsResult.add(in);
+            }
+            else
+            {
+                chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(), rowsResult));
+                rowsResult = new ArrayList<Integer[]>();
+                rowIndex = rowsNumber;
+                totalResultSize = 0;
+                rowsNumber = 0;
+                
             }
         }
         
-        MatrixDataChunk resultChunk = new MatrixDataChunk(chunk.getRowIndex(), chunk.getSize(), resultRow);
+        chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(), rowsResult));
         
-        return resultChunk.toString();
+        List<String> finalResults = new ArrayList<String>();
+        for (MatrixDataChunk ch : chunksResult)
+        {
+            finalResults.add(ch.toString());
+        }
+        
+        return finalResults;
         
     }
     
@@ -202,11 +252,11 @@ public class Worker
             
             deleteMessage(dataQueueURL, firstMessage);
 
+            ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
+            rmr.setMaxNumberOfMessages(10);
 
             do
             {
-                ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
-                rmr.setMaxNumberOfMessages(10);
                 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
                 List<Message> messages = result.getMessages();
@@ -252,30 +302,28 @@ public class Worker
 
             if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
             {
-                deleteMessage(workerQueueURL, firstMessage);
+                deleteMessage(dataQueueURL, firstMessage);
                 return;
             }
             else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
             {
-                deleteMessage(workerQueueURL, firstMessage);
+                deleteMessage(dataQueueURL, firstMessage);
                 System.exit(0);
             }
             
             MatrixDataChunk chunk = new MatrixDataChunk(firstMessage.getBody());
             matrixB = new Matrix(chunk.getSize());
             rowsToReceive = chunk.getSize() - 1;
-            matrixB.setRow(chunk.getMatrixRow(), chunk.getRowIndex());
+            matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
             
-            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, Operation.RECEPTION.toString());
-            sqsClient.sendMessage(smr);
-
             deleteMessage(workerQueueURL, firstMessage);
+
+            ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
+            rmr.setMaxNumberOfMessages(10);
             
             do
             {
-                ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
-                rmr.setMaxNumberOfMessages(10);
-                
+
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
                 List<Message> messages = result.getMessages();
                 
@@ -295,7 +343,7 @@ public class Worker
                         // }
                         
                         chunk = new MatrixDataChunk(m.getBody());
-                        matrixB.setRow(chunk.getMatrixRow(), chunk.getRowIndex());
+                        matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
                         deleteMessage(workerQueueURL, m);
                         rowsToReceive--;
                     }
@@ -304,12 +352,13 @@ public class Worker
                 
             } while (rowsToReceive > 0);
 
-            
+
+            rmr = new ReceiveMessageRequest(dataQueueURL);
+            rmr.setMaxNumberOfMessages(10);
+
             do
             {
-                ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
-                rmr.setMaxNumberOfMessages(10);
-                
+
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
                 List<Message> messages = result.getMessages();
                 
@@ -317,21 +366,24 @@ public class Worker
                 {
                     for (Message m : messages)
                     {
-                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // return;
-                        // }
-                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // System.exit(0);
-                        // }
+                        if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        {
+                            deleteMessage(dataQueueURL, m);
+                            return;
+                        }
+                        else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        {
+                            return;
+                        }
                         
                         chunk = new MatrixDataChunk(m.getBody());
-                        String res = processDataMultiplication(chunk);
-                        smr = new SendMessageRequest(resultQueueURL, res);
-                        sqsClient.sendMessage(smr);
+                        List<String> resultList = processDataMultiplication(chunk);
+                        
+                        for (String res : resultList)
+                        {
+                            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
+                            sqsClient.sendMessage(smr);
+                        }
 
                         deleteMessage(dataQueueURL, m);
                     }

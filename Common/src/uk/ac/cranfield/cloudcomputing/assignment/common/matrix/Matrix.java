@@ -1,5 +1,7 @@
 package uk.ac.cranfield.cloudcomputing.assignment.common.matrix;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 
@@ -29,14 +31,12 @@ public class Matrix
         }
     }
     
-    public void setRow(Integer[] row, Integer rowIndex)
+    public void setRows(List<Integer[]> rows, Integer rowIndex)
     {
-        if (row.length < size)
-            return;
-        
-        for (int i = 0; i < size; i++)
+        int endIndex = rowIndex + rows.size();
+        for (int i = rowIndex; i < endIndex; i++)
         {
-            matrix[rowIndex][i] = row[i];
+            matrix[i] = rows.get(i);
         }
     }
     
@@ -132,7 +132,7 @@ public class Matrix
         {
             for (int j = 0; j < size; j++)
             {
-                if (matrix[i][j] != m.getValue(i, j))
+                if (!matrix[i][j].equals(m.getValue(i, j)))
                     return false;
             }
         }
@@ -140,7 +140,20 @@ public class Matrix
         return true;
     }
     
-    public Integer[] getRow(Integer rowIndex)
+    public List<Integer[]> getRows(int startIndex, int n)
+    {
+        List<Integer[]> list = new ArrayList<Integer[]>();
+        
+        for (int i = 0; i < n; i++)
+        {
+            list.add(getRow(startIndex + i));
+        }
+        
+        return list;
+        
+    }
+    
+    public Integer[] getRow(int rowIndex)
     {
         Integer[] row = new Integer[size];
         
@@ -162,5 +175,116 @@ public class Matrix
         }
         
         return column;
+    }
+    
+    /**
+     * size - matrix row/column size
+     * rows - number of rows in one chunk
+     * if matrix is too big to divide to parts, new parts value are calculated
+     * @param parts number of matrix parts
+     * @return
+     */
+    public List<MatrixDataChunk> decompose(int parts)
+    {
+        int rows = 0;
+        List<MatrixDataChunk> result = new ArrayList<MatrixDataChunk>();
+        
+        rows = size / parts;
+        
+        if (rows * size > MatrixDataChunk.SIZE_LIMIT)
+        {
+            rows = MatrixDataChunk.SIZE_LIMIT / size;
+            parts = size / rows;
+            if (MatrixDataChunk.SIZE_LIMIT % size != 0)
+                parts++;
+        }
+        
+        
+        if (size % parts == 0)
+        {
+            for (int i = 0; i < size; i += rows)
+            {
+                MatrixDataChunk chunk = new MatrixDataChunk(rows, i, size, getRows(i, rows));
+                result.add(chunk);
+            }
+        }
+        else
+        {
+            int spareRows = size - rows * parts;
+            int extendedRows = rows + 1;
+            int i = 0;
+            
+            for (; i < spareRows * (extendedRows); i += extendedRows)
+            {
+                MatrixDataChunk chunk = new MatrixDataChunk(extendedRows, i, size, getRows(i, extendedRows));
+                result.add(chunk);
+            }
+            
+            for (; i < size; i += rows)
+            {
+                MatrixDataChunk chunk = new MatrixDataChunk(rows, i, size, getRows(i, rows));
+                result.add(chunk);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * size - matrix column size
+     * doubleSize - matrix row size
+     * rows - number of rows in one chunk
+     * if matrix is too big to divide to parts, new parts value are calculated
+     * @param parts number of matrix parts
+     * @return
+     */
+    public List<MatrixDoubleDataChunk> decompose(int parts, Matrix matrixB)
+    {
+        int rows = 0;
+        int doubleSize = 2 * size;
+        List<MatrixDoubleDataChunk> result = new ArrayList<MatrixDoubleDataChunk>();
+        
+        rows = size / parts;
+        
+        if (rows * doubleSize > MatrixDataChunk.SIZE_LIMIT)
+        {
+            rows = MatrixDataChunk.SIZE_LIMIT / doubleSize;
+            parts = size / rows;
+            if (MatrixDataChunk.SIZE_LIMIT % size != 0)
+                parts++;
+        }
+        
+        
+        if (size % parts == 0)
+        {
+            for (int i = 0; i < size; i += rows)
+            {
+                MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(rows, i, size, getRows(i, rows),
+                        matrixB.getRows(i, rows));
+                result.add(chunk);
+            }
+        }
+        else
+        {
+            int spareRows = size - rows * parts;
+            int extendedRows = rows + 1;
+            int i = 0;
+            
+            for (; i < spareRows * (extendedRows); i += extendedRows)
+            {
+                MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(extendedRows, i, size,
+                        getRows(i, extendedRows), matrixB.getRows(i, extendedRows));
+                result.add(chunk);
+            }
+            
+            for (; i < size; i += rows)
+            {
+                MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(rows, i, size, getRows(i, rows),
+                        matrixB.getRows(i, rows));
+                result.add(chunk);
+            }
+        }
+        
+        return result;
     }
 }
