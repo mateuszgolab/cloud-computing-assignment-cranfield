@@ -36,19 +36,14 @@ public class Worker
     private String dataQueueURL;
     private String resultQueueURL;
     private String workerQueueURL;
-    private String dataQueue;
-    private String resultQueue;
-    private String workerQueue;
     private Message firstMessage;
     private Matrix matrixB;
-    private Integer rowsToReceive;
+    private int rowsToReceive;
     
     
-    public Worker(String dataQueue, String resultQueue, String workerQueue)
+    public Worker()
     {
-        this.dataQueue = dataQueue;
-        this.resultQueue = resultQueue;
-        this.workerQueue = workerQueue;
+
 
         credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
         
@@ -57,7 +52,8 @@ public class Worker
         
     }
     
-    public void connectQueues() throws AmazonServiceException
+    public void connectToQueues(String dataQueue, String resultQueue, String workerQueue)
+            throws AmazonServiceException
     {
         
         try
@@ -70,6 +66,7 @@ public class Worker
             queueResult = sqsClient.createQueue(c);
             resultQueueURL = queueResult.getQueueUrl();
             
+
             c = new CreateQueueRequest(workerQueue);
             queueResult = sqsClient.createQueue(c);
             workerQueueURL = queueResult.getQueueUrl();
@@ -176,40 +173,36 @@ public class Worker
     public Operation receiveStartingMessage() throws AmazonServiceException
     {
         ReceiveMessageRequest additionRequest = new ReceiveMessageRequest(dataQueueURL);
-        additionRequest.setMaxNumberOfMessages(1);
         
-        ReceiveMessageRequest multiplicationRequest = new ReceiveMessageRequest(workerQueueURL);
-        multiplicationRequest.setMaxNumberOfMessages(1);
-
-        ReceiveMessageResult result = null;
-        List<Message> messages = null;
         
         try
         {
             
             do
             {
-                result = sqsClient.receiveMessage(additionRequest);
-                messages = result.getMessages();
+                ReceiveMessageResult result = sqsClient.receiveMessage(additionRequest);
+                List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
-                    firstMessage = messages.get(0);
-                    if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
+                    Message m = messages.get(0);
+                    
+                    if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
                     {
-                        deleteMessage(dataQueueURL, firstMessage);
+                        deleteMessage(dataQueueURL, m);
                         return Operation.END_PROGRAM;
                     }
-                    return Operation.ADDITION;
-                }
-                
-                result = sqsClient.receiveMessage(multiplicationRequest);
-                messages = result.getMessages();
+                    else if (Operation.ADDITION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                    {
+                        deleteMessage(dataQueueURL, m);
+                        return Operation.ADDITION;
+                    }
+                    else if (Operation.MULTIPLICATION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                    {
+                        deleteMessage(dataQueueURL, m);
+                        return Operation.MULTIPLICATION;
+                    }
 
-                if (messages.size() > 0)
-                {
-                    firstMessage = messages.get(0);
-                    return Operation.MULTIPLICATION;
                 }
 
                 Thread.sleep(1);
@@ -234,24 +227,6 @@ public class Worker
         try
         {
             
-            if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
-            {
-                deleteMessage(dataQueueURL, firstMessage);
-                return;
-            }
-            else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
-            {
-                deleteMessage(dataQueueURL, firstMessage);
-                System.exit(0);
-            }
-            
-            MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(firstMessage.getBody());
-            String res = processDataAddition(chunk);
-            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
-            sqsClient.sendMessage(smr);
-            
-            deleteMessage(dataQueueURL, firstMessage);
-
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
             rmr.setMaxNumberOfMessages(10);
 
@@ -265,20 +240,16 @@ public class Worker
                 {
                     for (Message m : messages)
                     {
-                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // return;
-                        // }
-                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // System.exit(0);
-                        // }
+                        if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        {
+                            deleteMessage(dataQueueURL, m);
+                            sendConfirmation();
+                            return;
+                        }
 
-                        chunk = new MatrixDoubleDataChunk(m.getBody());
-                        res = processDataAddition(chunk);
-                        smr = new SendMessageRequest(resultQueueURL, res);
+                        MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(m.getBody());
+                        String res = processDataAddition(chunk);
+                        SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
                         sqsClient.sendMessage(smr);
 
                         deleteMessage(dataQueueURL, m);
@@ -299,28 +270,12 @@ public class Worker
     {
         try
         {
-
-            if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
-            {
-                deleteMessage(dataQueueURL, firstMessage);
-                return;
-            }
-            else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(firstMessage.getBody()) == 0)
-            {
-                deleteMessage(dataQueueURL, firstMessage);
-                System.exit(0);
-            }
-            
-            MatrixDataChunk chunk = new MatrixDataChunk(firstMessage.getBody());
-            matrixB = new Matrix(chunk.getSize());
-            rowsToReceive = chunk.getSize() - 1;
-            matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
-            
-            deleteMessage(workerQueueURL, firstMessage);
-
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
             rmr.setMaxNumberOfMessages(10);
             
+            
+            // receiveing matrix B size
+
             do
             {
 
@@ -331,31 +286,49 @@ public class Worker
                 {
                     for (Message m : messages)
                     {
-                        // if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // return;
-                        // }
-                        // else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        // {
-                        // deleteMessage(dataQueueURL, m);
-                        // System.exit(0);
-                        // }
                         
-                        chunk = new MatrixDataChunk(m.getBody());
+                        MatrixDataChunk chunk = new MatrixDataChunk(m.getBody());
+                        matrixB = new Matrix(chunk.getSize());
                         matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
                         deleteMessage(workerQueueURL, m);
-                        rowsToReceive--;
+                        rowsToReceive = chunk.getSize() - chunk.getNumberOfRows();
                     }
+                    break;
                 }
                 Thread.sleep(WAIT_IN_MS);
                 
+            } while (true);
+            
+            
+            // receiving data for matrix B
+
+            do
+            {
+                
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    for (Message m : messages)
+                    {
+                        
+                        MatrixDataChunk chunk = new MatrixDataChunk(m.getBody());
+                        matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
+                        deleteMessage(workerQueueURL, m);
+                        rowsToReceive -= chunk.getNumberOfRows();
+                    }
+                }
+                Thread.sleep(WAIT_IN_MS);
+
             } while (rowsToReceive > 0);
 
 
             rmr = new ReceiveMessageRequest(dataQueueURL);
             rmr.setMaxNumberOfMessages(10);
 
+            
+            // receiving data for calculations
             do
             {
 
@@ -369,14 +342,12 @@ public class Worker
                         if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
                             deleteMessage(dataQueueURL, m);
-                            return;
-                        }
-                        else if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
-                        {
+                            sendConfirmation();
                             return;
                         }
                         
-                        chunk = new MatrixDataChunk(m.getBody());
+
+                        MatrixDataChunk chunk = new MatrixDataChunk(m.getBody());
                         List<String> resultList = processDataMultiplication(chunk);
                         
                         for (String res : resultList)
@@ -404,4 +375,9 @@ public class Worker
         return firstMessage;
     }
 
+    public void sendConfirmation()
+    {
+        SendMessageRequest smr = new SendMessageRequest(resultQueueURL, Operation.CONFIRMATION.toString());
+        sqsClient.sendMessage(smr);
+    }
 }

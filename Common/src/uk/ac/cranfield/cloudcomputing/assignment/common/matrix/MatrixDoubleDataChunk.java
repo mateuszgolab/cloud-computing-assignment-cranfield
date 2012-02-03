@@ -60,6 +60,7 @@ public class MatrixDoubleDataChunk extends MatrixDataChunk
     {
         String result = "";
         
+        result += numberOfRows + SEPARATOR;
         result += rowIndex + SEPARATOR;
         result += size + SEPARATOR;
         
