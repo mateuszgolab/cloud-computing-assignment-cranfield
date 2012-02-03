@@ -62,6 +62,7 @@ public class MatrixDataChunk
     {
         String result = "";
         
+        result += numberOfRows + SEPARATOR;
         result += rowIndex + SEPARATOR;
         result += size + SEPARATOR;
         

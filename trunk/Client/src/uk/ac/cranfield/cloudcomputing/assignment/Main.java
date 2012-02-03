@@ -6,6 +6,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 import uk.ac.cranfield.cloudcomputing.assignment.environment.CloudEnvironment;
 import uk.ac.cranfield.cloudcomputing.assignment.master.Master;
 import uk.ac.cranfield.cloudcomputing.assignment.master.MatrixDataUploader;
@@ -55,9 +56,6 @@ public class Main
         
         numberOfWorkers = 1;
         master = new Master(numberOfWorkers, SIZE);
-        // master.clearQueue(workersQueues.get(0), 100);
-        // master.clearQueue(DATA_QUEUE, 100);
-        // master.clearQueue(RESULT_QUEUE, 7);
         master.connectToQueues(DATA_QUEUE, RESULT_QUEUE);
         
         generateMatrixes();
@@ -73,6 +71,7 @@ public class Main
         System.out.println("Distributed matrix addition : " + distTime + " ms");
         System.out.println("Local matrix addition : " + localTime + " ms");
         
+        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
         master.endProgram();
         
         
@@ -106,6 +105,8 @@ public class Main
     private static long distributedMatrixAddition()
     {
         long time = System.currentTimeMillis();
+        master.sendMessage(Operation.ADDITION);
+        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
         MatrixDoubleDataUploader doubleUploader = new MatrixDoubleDataUploader(matrixA, matrixB,
                 master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
         doubleUploader.send();
@@ -118,9 +119,13 @@ public class Main
     {
         long time = System.currentTimeMillis();
         
+        master.sendMessage(Operation.MULTIPLICATION);
+        
         MatrixDataUploader uploader = new MatrixDataUploader(matrixB, workersQueues, credentials, 1);
         uploader.connectToQueue();
         uploader.send();
+        
+        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
         
         uploader = new MatrixDataUploader(matrixA, master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
         uploader.send();
