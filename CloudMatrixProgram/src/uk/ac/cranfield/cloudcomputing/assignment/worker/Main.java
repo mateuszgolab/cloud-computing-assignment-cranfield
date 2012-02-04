@@ -18,11 +18,11 @@ public class Main
     {
         Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
         
-        // if (args == null || args.length < 1)
-        // return;
-        // workerQueue = args[0] + "workerQueue";
+        if (args == null || args.length < 1)
+            return;
+        workerQueue = args[0] + "_matWorkerQueue";
 
-        workerQueue = "i-c0f08e89workerQueue";
+        // workerQueue = "i-6c4a0c_matWorkerQueue";
         
         try
         {

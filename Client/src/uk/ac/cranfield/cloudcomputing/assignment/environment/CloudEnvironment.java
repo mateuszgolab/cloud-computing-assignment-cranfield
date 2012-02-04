@@ -11,6 +11,8 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
+import com.amazonaws.services.ec2.model.CreateImageRequest;
+import com.amazonaws.services.ec2.model.CreateImageResult;
 import com.amazonaws.services.ec2.model.CreateKeyPairRequest;
 import com.amazonaws.services.ec2.model.CreateKeyPairResult;
 import com.amazonaws.services.ec2.model.CreateSecurityGroupRequest;
@@ -23,6 +25,7 @@ import com.amazonaws.services.ec2.model.KeyPair;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.RunInstancesResult;
 import com.amazonaws.services.ec2.model.Tag;
+import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 
 public class CloudEnvironment
@@ -42,12 +45,14 @@ public class CloudEnvironment
     private List<String> securityGroupIds;
     private KeyPair keyPair;
     private List<String> workerQueuesNames;
+    private List<String> instancesIds;
     
     
     public CloudEnvironment(AWSCredentials credentials)
     {
         this.credentials = credentials;
         workerQueuesNames = new ArrayList<String>();
+        instancesIds = new ArrayList<String>();
         clientEC2 = new AmazonEC2Client(credentials);
         clientEC2.setEndpoint(ENDPOINT_ZONE);
     }
@@ -139,9 +144,16 @@ public class CloudEnvironment
         
         for (Instance instance : ins)
         {
+            instancesIds.add(instance.getInstanceId());
+            workerQueuesNames.add(instance.getInstanceId() + "_matWorkerQueue");
+        }
+        
+        for (String id : instancesIds)
+        {
             CreateTagsRequest createTagsRequest = new CreateTagsRequest();
-            createTagsRequest.withResources(instance.getInstanceId()).withTags(new Tag("Name", name));
+            createTagsRequest.withResources(id).withTags(new Tag("Name", name));
             clientEC2.createTags(createTagsRequest);
+            
         }
         
     }
@@ -172,7 +184,8 @@ public class CloudEnvironment
             CreateTagsRequest createTagsRequest = new CreateTagsRequest();
             createTagsRequest.withResources(instance.getInstanceId()).withTags(new Tag("Name", name));
             clientEC2.createTags(createTagsRequest);
-            workerQueuesNames.add(instance.getInstanceId() + "workerQueue");
+            workerQueuesNames.add(instance.getInstanceId() + "_matWorkerQueue");
+            instancesIds.add(instance.getImageId());
         }
     }
     
@@ -181,5 +194,19 @@ public class CloudEnvironment
         return workerQueuesNames;
     }
     
+    public void createImage(String instanceId, String name)
+    {
+        CreateImageRequest imageRequest = new CreateImageRequest(instanceId, name);
+        CreateImageResult result = clientEC2.createImage(imageRequest);
+        
+        CreateTagsRequest createTagsRequest = new CreateTagsRequest();
+        createTagsRequest.withResources(result.getImageId()).withTags(new Tag("Name", name));
+        clientEC2.createTags(createTagsRequest);
+    }
     
+    public void terminateInstances()
+    {
+        TerminateInstancesRequest request = new TerminateInstancesRequest(instancesIds);
+        clientEC2.terminateInstances(request);
+    }
 }

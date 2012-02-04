@@ -121,6 +121,9 @@ public class Master
                         DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
                         sqsClient.deleteMessage(delMes);
                         rowsReceived -= receivedChunk.getNumberOfRows();
+                        double progress = (receivedChunk.getSize() - rowsReceived) * 10000 / receivedChunk.getSize();
+                        progress /= 100;
+                        System.out.println("Received : " + progress + " %");
                     }
                     
                 }
@@ -202,14 +205,6 @@ public class Master
         } while (n > 0);
     }
     
-    public void endProgram()
-    {
-        for (int i = 0; i < numberOfWorkers; i++)
-        {
-            sendMessage(Operation.END_PROGRAM);
-        }
-    }
-    
     public String getDataQueueURL()
     {
         return dataQueueURL;
@@ -217,33 +212,50 @@ public class Master
     
     public void sendMessage(Operation op)
     {
-        SendMessageRequest smr = new SendMessageRequest(dataQueueURL, op.toString());
-        sqsClient.sendMessage(smr);
+        for (int i = 0; i < numberOfWorkers; i++)
+        {
+            SendMessageRequest smr = new SendMessageRequest(dataQueueURL, op.toString());
+            sqsClient.sendMessage(smr);
+        }
+        
     }
     
-    public void receiveMessages(Operation op, int numberOfWorkers)
+    public void receiveMessages(Operation op)
     {
         ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
         rmr.setMaxNumberOfMessages(10);
+        int n = numberOfWorkers;
         
-        do
+        try
         {
-            ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
-            List<Message> messages = result.getMessages();
             
-            if (messages.size() > 0)
+            do
             {
-                for (Message m : messages)
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
                 {
-                    if (Operation.CONFIRMATION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                    for (Message m : messages)
                     {
-                        DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
-                        sqsClient.deleteMessage(delMes);
-                        numberOfWorkers--;
+                        if (Operation.CONFIRMATION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        {
+                            DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
+                            sqsClient.deleteMessage(delMes);
+                            n--;
+                        }
                     }
                 }
-            }
+                
+                Thread.sleep(WAIT_IN_MS);
+                
+                
+            } while (n > 0);
             
-        } while (numberOfWorkers > 0);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
     }
 }
