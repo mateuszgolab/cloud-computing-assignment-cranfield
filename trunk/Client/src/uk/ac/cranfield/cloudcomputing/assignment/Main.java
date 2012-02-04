@@ -1,6 +1,5 @@
 package uk.ac.cranfield.cloudcomputing.assignment;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,10 +22,12 @@ public class Main
     private static final String secretAccessKey = "YE6bdpvIDtQPiqG1XCUYINBk6RlID3bEE5EvFPko";
     public static final String DATA_QUEUE = "matDataQueue";
     public static final String RESULT_QUEUE = "matResultQueue";
+    public static final String IMAGE_NAME = "matWorkerAMI";
     // public static final String LINUX_32_AMI = "ami-973b06e3";
-    public static final String LINUX_32_AMI = "ami-913b05e5";
+    public static final String LINUX_32_AMI = "ami-53fdc327";
     public static final Integer KEY = 10;
-    public static final Integer SIZE = 100;
+    public static final Integer SIZE = 2000;
+    private static final int NUMBER_OF_WORKERS = 8;
     public static final int NUMBER_OF_DATA_BLOCKS = 32;
     public static List<String> workersQueues;
     
@@ -36,7 +37,6 @@ public class Main
     private static Matrix matrixLocalResult;
     private static Master master;
     private static AWSCredentials credentials;
-    private static Integer numberOfWorkers;
     
     
     /**
@@ -48,14 +48,26 @@ public class Main
         
         credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
         CloudEnvironment env = new CloudEnvironment(credentials);
-        // env.createInstance("matWorker2", LINUX_32_AMI);
-        // workersQueues = env.getWorkerQueuesNames();
-        workersQueues = new ArrayList<String>();
-        workersQueues.add("i-c0f08e89workerQueue");
-        // workersQueues.add("i-8c82fbc5workerQueue");
+        // env.createImage("i-625f192b", IMAGE_NAME);
+        env.createInstances(NUMBER_OF_WORKERS, "matWorker", LINUX_32_AMI);
+        workersQueues = env.getWorkerQueuesNames();
         
-        numberOfWorkers = 1;
-        master = new Master(numberOfWorkers, SIZE);
+        
+        // workersQueues = new ArrayList<String>();
+        // workersQueues.add("i-58723411_matWorkerQueue");
+        // workersQueues.add("i-5a723413_matWorkerQueue");
+        //
+        // workersQueues.add("i-5c723415_matWorkerQueue");
+        // workersQueues.add("i-5e723417_matWorkerQueue");
+        //
+        // workersQueues.add("i-50723419_matWorkerQueue");
+        // workersQueues.add("i-5272341b_matWorkerQueue");
+        //
+        // workersQueues.add("i-5472341d_matWorkerQueue");
+        // workersQueues.add("i-5672341f_matWorkerQueue");
+        //
+        
+        master = new Master(NUMBER_OF_WORKERS, SIZE);
         master.connectToQueues(DATA_QUEUE, RESULT_QUEUE);
         
         generateMatrixes();
@@ -64,16 +76,18 @@ public class Main
         // long localTime = localMatrixAddition();
         
         long distTime = distributedMatrixMultiplication();
+        System.out.println("Distributed matrix multiplication time : " + distTime + " ms");
         long localTime = localMatrixMultiplication();
+        System.out.println("Local matrix multiplication time : " + localTime + " ms");
         
         validateResults();
         
-        System.out.println("Distributed matrix addition : " + distTime + " ms");
-        System.out.println("Local matrix addition : " + localTime + " ms");
+        master.receiveMessages(Operation.CONFIRMATION);
         
-        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
-        master.endProgram();
         
+        master.sendMessage(Operation.END_PROGRAM);
+        env.terminateInstances();
+        //
         
     }
     
@@ -106,7 +120,7 @@ public class Main
     {
         long time = System.currentTimeMillis();
         master.sendMessage(Operation.ADDITION);
-        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
+        master.receiveMessages(Operation.CONFIRMATION);
         MatrixDoubleDataUploader doubleUploader = new MatrixDoubleDataUploader(matrixA, matrixB,
                 master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
         doubleUploader.send();
@@ -125,7 +139,9 @@ public class Main
         uploader.connectToQueue();
         uploader.send();
         
-        master.receiveMessages(Operation.CONFIRMATION, numberOfWorkers);
+        master.receiveMessages(Operation.CONFIRMATION);
+        master.receiveMessages(Operation.CONFIRMATION);
+        uploader.sendMessageToWorkers(Operation.CONFIRMATION);
         
         uploader = new MatrixDataUploader(matrixA, master.getDataQueueURL(), credentials, NUMBER_OF_DATA_BLOCKS);
         uploader.send();
@@ -137,6 +153,8 @@ public class Main
     
     private static void validateResults()
     {
+        System.out.println("Validating results ...");
+        
         if (matrixLocalResult.equals(matrixResult))
             System.out.println("matrixes are equal");
         else

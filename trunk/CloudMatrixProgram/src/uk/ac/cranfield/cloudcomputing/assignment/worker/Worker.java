@@ -31,6 +31,7 @@ public class Worker
     private static final String secretAccessKey = "YE6bdpvIDtQPiqG1XCUYINBk6RlID3bEE5EvFPko";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     public static final Integer WAIT_IN_MS = 1;
+    public static final Integer POOLING_WAITING_TIME_IN_MS = 100;
     private AmazonSQSClient sqsClient;
     private AWSCredentials credentials;
     private String dataQueueURL;
@@ -133,7 +134,7 @@ public class Worker
         
         int totalResultSize = 0;
         int rowsNumber = 0;
-        int rowIndex = 0;
+        int rowIndex = chunk.getRowIndex();
         List<Integer[]> rowsResult = new ArrayList<Integer[]>();
         List<MatrixResultDataChunk> chunksResult = new ArrayList<MatrixResultDataChunk>();
         
@@ -149,16 +150,19 @@ public class Worker
             }
             else
             {
-                chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(), rowsResult));
+                chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(),
+                        rowsResult));
+                rowIndex += rowsNumber;
+
                 rowsResult = new ArrayList<Integer[]>();
-                rowIndex = rowsNumber;
-                totalResultSize = 0;
-                rowsNumber = 0;
-                
+                rowsNumber = 1;
+                totalResultSize = size;
+                rowsResult.add(in);
             }
         }
         
-        chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(), rowsResult));
+        chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(),
+                rowsResult));
         
         List<String> finalResults = new ArrayList<String>();
         for (MatrixDataChunk ch : chunksResult)
@@ -172,7 +176,8 @@ public class Worker
     
     public Operation receiveStartingMessage() throws AmazonServiceException
     {
-        ReceiveMessageRequest additionRequest = new ReceiveMessageRequest(dataQueueURL);
+        ReceiveMessageRequest request = new ReceiveMessageRequest(dataQueueURL);
+        request.setVisibilityTimeout(1);
         
         
         try
@@ -180,7 +185,7 @@ public class Worker
             
             do
             {
-                ReceiveMessageResult result = sqsClient.receiveMessage(additionRequest);
+                ReceiveMessageResult result = sqsClient.receiveMessage(request);
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
@@ -205,7 +210,7 @@ public class Worker
 
                 }
 
-                Thread.sleep(1);
+                Thread.sleep(POOLING_WAITING_TIME_IN_MS);
                 
             } while (true);
         }
@@ -271,9 +276,10 @@ public class Worker
         try
         {
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
-            rmr.setMaxNumberOfMessages(10);
             
             
+
+
             // receiveing matrix B size
 
             do
@@ -284,15 +290,12 @@ public class Worker
                 
                 if (messages.size() > 0)
                 {
-                    for (Message m : messages)
-                    {
-                        
-                        MatrixDataChunk chunk = new MatrixDataChunk(m.getBody());
-                        matrixB = new Matrix(chunk.getSize());
-                        matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
-                        deleteMessage(workerQueueURL, m);
-                        rowsToReceive = chunk.getSize() - chunk.getNumberOfRows();
-                    }
+                    Message m = messages.get(0);
+                    MatrixDataChunk chunk = new MatrixDataChunk(m.getBody());
+                    matrixB = new Matrix(chunk.getSize());
+                    matrixB.setRows(chunk.getMatrixRows(), chunk.getRowIndex());
+                    deleteMessage(workerQueueURL, m);
+                    rowsToReceive = chunk.getSize() - chunk.getNumberOfRows();
                     break;
                 }
                 Thread.sleep(WAIT_IN_MS);
@@ -301,6 +304,8 @@ public class Worker
             
             
             // receiving data for matrix B
+
+            rmr.setMaxNumberOfMessages(10);
 
             do
             {
@@ -322,12 +327,17 @@ public class Worker
                 Thread.sleep(WAIT_IN_MS);
 
             } while (rowsToReceive > 0);
+            
 
 
             rmr = new ReceiveMessageRequest(dataQueueURL);
             rmr.setMaxNumberOfMessages(10);
-
+            rmr.setVisibilityTimeout(600);
             
+
+            sendConfirmation();
+            waitForOtherWorkers();
+
             // receiving data for calculations
             do
             {
@@ -379,5 +389,38 @@ public class Worker
     {
         SendMessageRequest smr = new SendMessageRequest(resultQueueURL, Operation.CONFIRMATION.toString());
         sqsClient.sendMessage(smr);
+    }
+
+    private void waitForOtherWorkers()
+    {
+        ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
+        
+        try
+        {
+            do
+            {
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    Message m = messages.get(0);
+                    
+                    if (Operation.CONFIRMATION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                    {
+                        DeleteMessageRequest delMes = new DeleteMessageRequest(workerQueueURL, m.getReceiptHandle());
+                        sqsClient.deleteMessage(delMes);
+                        break;
+                    }
+                }
+                
+                Thread.sleep(WAIT_IN_MS);
+                
+            } while (true);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
     }
 }

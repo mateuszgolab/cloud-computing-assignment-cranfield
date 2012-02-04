@@ -5,6 +5,7 @@ import java.util.List;
 
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
+import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -100,5 +101,14 @@ public class MatrixDataUploader
             }
         }
         
+    }
+    
+    public void sendMessageToWorkers(Operation op)
+    {
+        for (String url : queuesURLs)
+        {
+            SendMessageRequest smr = new SendMessageRequest(url, op.toString());
+            sqsClient.sendMessage(smr);
+        }
     }
 }

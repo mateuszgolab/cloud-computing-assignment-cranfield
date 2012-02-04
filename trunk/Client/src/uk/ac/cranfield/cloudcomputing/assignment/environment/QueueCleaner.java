@@ -63,9 +63,10 @@ public class QueueCleaner
     public static void main(String[] arg)
     {
         QueueCleaner q = new QueueCleaner();
-        // q.clearQueue(DATA_QUEUE, 32);
-        // q.clearQueue(workerQueue, 1);
-        q.clearQueue(RESULT_QUEUE, 32);
+        
+        // q.clearQueue("i-9c3177d5_matWorkerQueue", 1);
+        q.clearQueue(DATA_QUEUE, 1);
+        // q.clearQueue(RESULT_QUEUE, 3);
         
     }
 }

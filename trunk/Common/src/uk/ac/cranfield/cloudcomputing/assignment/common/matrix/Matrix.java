@@ -10,7 +10,7 @@ public class Matrix
     
     
     private Integer[][] matrix;
-    private Integer size;
+    private int size;
     
     public Matrix(Integer size)
     {
@@ -36,7 +36,7 @@ public class Matrix
         int endIndex = rowIndex + rows.size();
         for (int i = rowIndex; i < endIndex; i++)
         {
-            matrix[i] = rows.get(i);
+            matrix[i] = rows.get(i - rowIndex);
         }
     }
     
@@ -191,14 +191,19 @@ public class Matrix
         
         rows = size / parts;
         
+        if (parts % rows != 0)
+            rows++;
+        
         if (rows * size > MatrixDataChunk.SIZE_LIMIT)
         {
             rows = MatrixDataChunk.SIZE_LIMIT / size;
             parts = size / rows;
-            if (MatrixDataChunk.SIZE_LIMIT % size != 0)
+            if (size % rows != 0)
                 parts++;
+            
         }
         
+        rows = size / parts;
         
         if (size % parts == 0)
         {
