@@ -3,6 +3,7 @@ package uk.ac.cranfield.cloudcomputing.assignment.worker;
 import java.util.ArrayList;
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDoubleDataChunk;
@@ -11,8 +12,6 @@ import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
@@ -27,13 +26,10 @@ import com.amazonaws.services.sqs.model.SendMessageRequest;
 public class Worker
 {
     
-    private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
-    private static final String secretAccessKey = "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";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     public static final Integer WAIT_IN_MS = 1;
     public static final Integer POOLING_WAITING_TIME_IN_MS = 100;
     private AmazonSQSClient sqsClient;
-    private AWSCredentials credentials;
     private String dataQueueURL;
     private String resultQueueURL;
     private String workerQueueURL;
@@ -44,11 +40,7 @@ public class Worker
     
     public Worker()
     {
-
-
-        credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
-        
-        sqsClient = new AmazonSQSClient(credentials);
+        sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
     }
