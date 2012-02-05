@@ -5,7 +5,6 @@ import java.util.List;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDoubleDataChunk;
 
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 
 
@@ -14,17 +13,15 @@ public class MatrixDoubleDataUploader extends MatrixDataUploader
     
     private Matrix matrix2;
     
-    public MatrixDoubleDataUploader(Matrix matrixA, Matrix matrixB, List<String> queues, AWSCredentials credentials,
-            int numberOfDataBlocks)
+    public MatrixDoubleDataUploader(Matrix matrixA, Matrix matrixB, List<String> queues, int numberOfDataBlocks)
     {
-        super(matrixA, queues, credentials, numberOfDataBlocks);
+        super(matrixA, queues, numberOfDataBlocks);
         matrix2 = matrixB;
     }
     
-    public MatrixDoubleDataUploader(Matrix matrixA, Matrix matrixB, String queue, AWSCredentials credentials,
-            int numberOfDataBlocks)
+    public MatrixDoubleDataUploader(Matrix matrixA, Matrix matrixB, String queue, int numberOfDataBlocks)
     {
-        super(matrixA, queue, credentials, numberOfDataBlocks);
+        super(matrixA, queue, numberOfDataBlocks);
         matrix2 = matrixB;
     }
     

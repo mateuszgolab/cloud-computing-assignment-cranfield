@@ -2,14 +2,14 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixResultDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
+import uk.ac.cranfield.cloudcomputing.assignment.view.StatusPanel;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
@@ -24,12 +24,9 @@ import com.amazonaws.services.sqs.model.SendMessageRequest;
 public class Master
 {
     
-    private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
-    private static final String secretAccessKey = "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";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     public static final Integer WAIT_IN_MS = 1;
     private AmazonSQSClient sqsClient;
-    private AWSCredentials credentials;
     private String dataQueueURL;
     private String resultQueueURL;
     private int rowsReceived;
@@ -39,28 +36,21 @@ public class Master
     private Matrix matrixResult;
     private int key;
     private int numberOfWorkers;
+    private StatusPanel status;
     
     
-    public Master(int workers, int size)
+    public Master(int workers, int size, StatusPanel status)
     {
+        this.status = status;
         rowsReceived = size;
         numberOfWorkers = workers;
-        credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
         matrixResult = new Matrix(size);
         
-        sqsClient = new AmazonSQSClient(credentials);
+        sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
     }
     
-    public Master(int workers, Matrix a, Matrix b, Integer k)
-    {
-        this(workers, a.getSize());
-        matrixA = a;
-        matrixB = b;
-        matrixResult = new Matrix(a.getSize());
-        key = k;
-    }
     
     public void connectToQueues(String dataQueue, String resultQueue)
     {
@@ -123,7 +113,7 @@ public class Master
                         rowsReceived -= receivedChunk.getNumberOfRows();
                         double progress = (receivedChunk.getSize() - rowsReceived) * 10000 / receivedChunk.getSize();
                         progress /= 100;
-                        System.out.println("Received : " + progress + " %");
+                        status.print("Received : " + progress + " %");
                     }
                     
                 }

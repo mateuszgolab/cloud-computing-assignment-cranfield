@@ -3,13 +3,13 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 import java.util.ArrayList;
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Operation;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.CreateQueueResult;
@@ -19,39 +19,34 @@ import com.amazonaws.services.sqs.model.SendMessageRequest;
 public class MatrixDataUploader
 {
     
-    private static final String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
-    private static final String secretAccessKey = "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";
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     
     protected List<String> queuesURLs;
     private List<String> queuesNames;
     protected AmazonSQSClient sqsClient;
-    private AWSCredentials credentials;
     protected Matrix matrix;
     protected int numberOfDataBlocks;
     
-    public MatrixDataUploader(Matrix matrix, List<String> queues, AWSCredentials credentials, int numberOfDataBlocks)
+    public MatrixDataUploader(Matrix matrix, List<String> queues, int numberOfDataBlocks)
     {
         this.numberOfDataBlocks = numberOfDataBlocks;
         this.queuesNames = queues;
-        this.credentials = credentials;
         this.matrix = matrix;
         this.queuesURLs = new ArrayList<String>();
         
-        sqsClient = new AmazonSQSClient(credentials);
+        sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
     }
     
-    public MatrixDataUploader(Matrix matrix, String queueURL, AWSCredentials credentials, int numberOfDataBlocks)
+    public MatrixDataUploader(Matrix matrix, String queueURL, int numberOfDataBlocks)
     {
         this.numberOfDataBlocks = numberOfDataBlocks;
-        this.credentials = credentials;
         this.matrix = matrix;
         this.queuesURLs = new ArrayList<String>();
         this.queuesURLs.add(queueURL);
         
-        sqsClient = new AmazonSQSClient(credentials);
+        sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
     }
