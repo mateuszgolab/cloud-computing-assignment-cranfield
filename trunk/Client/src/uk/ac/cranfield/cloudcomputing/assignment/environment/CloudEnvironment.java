@@ -6,8 +6,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
+
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.AuthorizeSecurityGroupIngressRequest;
@@ -41,19 +42,17 @@ public class CloudEnvironment
     public static final Integer SSH_PORT = 22;
     public static final String CRANFIELD_SUBNET = "138.250.0.0/16";
     private AmazonEC2 clientEC2;
-    private AWSCredentials credentials;
     private List<String> securityGroupIds;
     private KeyPair keyPair;
     private List<String> workerQueuesNames;
     private List<String> instancesIds;
     
     
-    public CloudEnvironment(AWSCredentials credentials)
+    public CloudEnvironment()
     {
-        this.credentials = credentials;
         workerQueuesNames = new ArrayList<String>();
         instancesIds = new ArrayList<String>();
-        clientEC2 = new AmazonEC2Client(credentials);
+        clientEC2 = new AmazonEC2Client(AWSCredentialsBean.getCredentials());
         clientEC2.setEndpoint(ENDPOINT_ZONE);
     }
     
@@ -206,7 +205,14 @@ public class CloudEnvironment
     
     public void terminateInstances()
     {
+        if (instancesIds.size() == 0)
+            return;
         TerminateInstancesRequest request = new TerminateInstancesRequest(instancesIds);
         clientEC2.terminateInstances(request);
+    }
+    
+    public List<String> getInstancesIds()
+    {
+        return instancesIds;
     }
 }
