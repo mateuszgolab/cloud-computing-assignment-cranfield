@@ -1,5 +1,6 @@
 package uk.ac.cranfield.cloudcomputing.assignment.view;
 
+import java.awt.BorderLayout;
 import java.awt.GridLayout;
 
 import javax.swing.JButton;
@@ -14,7 +15,7 @@ import uk.ac.cranfield.cloudcomputing.assignment.Controller;
 public class MainPanel extends JPanel
 {
     
-    public static final int MATRIX_SIZE_LIMIT = 3000;
+    public static final int MATRIX_SIZE_LIMIT = 2000;
     public static final int NODES_NUMBER_LIMIT = 8;
     public static final int DATA_BLOCKS_LIMIT = 4;
     
@@ -29,16 +30,21 @@ public class MainPanel extends JPanel
     private JButton exitProgram;
     private JLabel localResultsLabel;
     private JLabel distResultsLabel;
-    private JLabel validationLabel;
+    private JLabel costLabel;
     private JTextField localResultsText;
     private JTextField distResultsText;
-    private JTextField validationText;
+    private JTextField costText;
+    private JPanel timingPanel;
+    private JPanel inputPanel;
     
     public MainPanel()
     {
-        super(new GridLayout(9, 3, 10, 10));
+        super(new BorderLayout());
+        inputPanel = new JPanel(new GridLayout(4, 3, 10, 10));
+        timingPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        
         matrixSizeLabel = new JLabel("  Matrix size (NxN) N : ");
-        matrixSizeText = new JTextField("1000");
+        matrixSizeText = new JTextField("500");
         workingNodesLabel = new JLabel("  Number of working nodes : ");
         workingNodesText = new JTextField("8");
         dataBlocksLabel = new JLabel("  Number of data blocks : ");
@@ -49,33 +55,38 @@ public class MainPanel extends JPanel
         distResultsLabel = new JLabel("  Distributed calculations time : ");
         distResultsText = new JTextField("");
         distResultsText.setEditable(false);
-        validationLabel = new JLabel("  Validation result : ");
-        validationText = new JTextField("");
-        validationText.setEditable(false);
+        costLabel = new JLabel("  Communication cost : ");
+        costText = new JTextField("");
         
         startAddition = new JButton("start matrix addition");
         startMultiplication = new JButton("start matrix multiplication");
         exitProgram = new JButton("exit program");
         
         
-        add(matrixSizeLabel);
-        add(matrixSizeText);
-        add(workingNodesLabel);
-        add(workingNodesText);
-        add(dataBlocksLabel);
-        add(dataBlocksText);
-        add(new JLabel());
-        add(startAddition);
-        add(new JLabel());
-        add(startMultiplication);
-        add(new JLabel());
-        add(exitProgram);
-        add(validationLabel);
-        add(validationText);
-        add(distResultsLabel);
-        add(distResultsText);
-        add(localResultsLabel);
-        add(localResultsText);
+        inputPanel.add(matrixSizeLabel);
+        inputPanel.add(matrixSizeText);
+        inputPanel.add(startMultiplication);
+        inputPanel.add(workingNodesLabel);
+        inputPanel.add(workingNodesText);
+        inputPanel.add(startAddition);
+        inputPanel.add(dataBlocksLabel);
+        inputPanel.add(dataBlocksText);
+        inputPanel.add(exitProgram);
+        inputPanel.add(new JLabel());
+        inputPanel.add(new JLabel());
+        inputPanel.add(new JLabel());
+        
+        timingPanel.add(distResultsLabel);
+        timingPanel.add(distResultsText);
+        timingPanel.add(localResultsLabel);
+        timingPanel.add(localResultsText);
+        timingPanel.add(costLabel);
+        timingPanel.add(costText);
+        timingPanel.add(new JLabel());
+        timingPanel.add(new JLabel());
+        
+        add(inputPanel, BorderLayout.NORTH);
+        add(timingPanel, BorderLayout.SOUTH);
     }
     
     public void addActionListener(Controller listener)
@@ -116,11 +127,6 @@ public class MainPanel extends JPanel
         return Integer.parseInt(dataBlocksText.getText());
     }
     
-    public void setValidationResult(String text)
-    {
-        validationText.setText(text);
-    }
-    
     public void setDistResults(String text)
     {
         distResultsText.setText(text);
@@ -131,11 +137,19 @@ public class MainPanel extends JPanel
         localResultsText.setText(text);
     }
     
-    public void clear()
+    public void setCost(Integer req)
+    {
+        Double cost = 0.001;
+        cost *= req;
+        
+        costText.setText("$ " + cost);
+    }
+    
+    public void reset()
     {
         localResultsText.setText("");
         distResultsText.setText("");
-        validationText.setText("");
+        costText.setText("");
     }
     
     public boolean wrongValues()

@@ -33,7 +33,7 @@ public class Worker
     private String dataQueueURL;
     private String resultQueueURL;
     private String workerQueueURL;
-    private Message firstMessage;
+    private String messageQueueURL;
     private Matrix matrixB;
     private int rowsToReceive;
     
@@ -45,7 +45,7 @@ public class Worker
         
     }
     
-    public void connectToQueues(String dataQueue, String resultQueue, String workerQueue)
+    public void connectToQueues(String dataQueue, String resultQueue, String messageQueue, String workerQueue)
             throws AmazonServiceException
     {
         
@@ -54,16 +54,25 @@ public class Worker
             CreateQueueRequest c = new CreateQueueRequest(dataQueue);
             CreateQueueResult queueResult = sqsClient.createQueue(c);
             dataQueueURL = queueResult.getQueueUrl();
+            Main.incRequest();
             
             c = new CreateQueueRequest(resultQueue);
             queueResult = sqsClient.createQueue(c);
             resultQueueURL = queueResult.getQueueUrl();
+            Main.incRequest();
             
 
             c = new CreateQueueRequest(workerQueue);
             queueResult = sqsClient.createQueue(c);
             workerQueueURL = queueResult.getQueueUrl();
+            Main.incRequest();
             
+            c = new CreateQueueRequest(messageQueue);
+            queueResult = sqsClient.createQueue(c);
+            messageQueueURL = queueResult.getQueueUrl();
+            Main.incRequest();
+
+
         }
         catch (AmazonClientException ace)
         {
@@ -79,13 +88,19 @@ public class Worker
     {
         DeleteQueueRequest del = new DeleteQueueRequest(workerQueueURL);
         sqsClient.deleteQueue(del);
+        Main.incRequest();
     }
     
-    public String processDataAddition(MatrixDoubleDataChunk chunk)
+    private List<String> processDataAddition(MatrixDoubleDataChunk chunk)
     {
         List<Integer[]> rowsA = chunk.getMatrixRows();
         List<Integer[]> rowsB = chunk.getMatrixBRows();
         List<Integer[]> resultRows = new ArrayList<Integer[]>();
+        List<String> resultChunks = new ArrayList<String>();
+        int rowsSize = 0;
+        int rowIndex = chunk.getRowIndex();
+        int rowsCount = 0;
+
         
         for (int i = 0; i < chunk.getNumberOfRows(); i++)
         {
@@ -97,14 +112,45 @@ public class Worker
                 rowA[j] += rowB[j];
             }
             
-            resultRows.add(rowA);
+            int size = MatrixDataChunk.getRowLength(rowA);
+            
+            if (rowsSize + size > MatrixDataChunk.SIZE_LIMIT)
+            {
+                resultChunks
+                        .add(new MatrixResultDataChunk(rowsCount, rowIndex, chunk.getSize(), resultRows)
+                        .toString());
+                
+                rowIndex += rowsCount;
+                resultRows = new ArrayList<Integer[]>();
+                resultRows.add(rowA);
+                rowsSize = size;
+                rowsCount = 1;
+                
+            }
+            else
+            {
+                rowsCount++;
+                rowsSize += size;
+                resultRows.add(rowA);
+            }
+            
+        }
+
+        if (rowsCount < chunk.getNumberOfRows())
+        {
+            resultChunks.add(new MatrixResultDataChunk(rowsCount, rowIndex, chunk.getSize(), resultRows)
+                    .toString());
+        }
+        else
+        {
+            resultChunks.add(new MatrixResultDataChunk(chunk.getNumberOfRows(), chunk.getRowIndex(), chunk.getSize(),
+                    resultRows).toString());
         }
         
-        return new MatrixResultDataChunk(chunk.getNumberOfRows(), chunk.getRowIndex(), chunk.getSize(), resultRows)
-                .toString();
+        return resultChunks;
     }
     
-    public List<String> processDataMultiplication(MatrixDataChunk chunk)
+    private List<String> processDataMultiplication(MatrixDataChunk chunk)
     {
         List<Integer[]> rows = chunk.getMatrixRows();
         List<Integer[]> allRowsResults = new ArrayList<Integer[]>();
@@ -168,7 +214,7 @@ public class Worker
     
     public Operation receiveStartingMessage() throws AmazonServiceException
     {
-        ReceiveMessageRequest request = new ReceiveMessageRequest(dataQueueURL);
+        ReceiveMessageRequest request = new ReceiveMessageRequest(messageQueueURL);
         request.setVisibilityTimeout(1);
         
         
@@ -178,25 +224,26 @@ public class Worker
             do
             {
                 ReceiveMessageResult result = sqsClient.receiveMessage(request);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
                     Message m = messages.get(0);
                     
-                    if (Operation.END_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
+                    if (Operation.END_OF_PROGRAM.toString().compareToIgnoreCase(m.getBody()) == 0)
                     {
-                        deleteMessage(dataQueueURL, m);
-                        return Operation.END_PROGRAM;
+                        deleteMessage(messageQueueURL, m);
+                        return Operation.END_OF_PROGRAM;
                     }
                     else if (Operation.ADDITION.toString().compareToIgnoreCase(m.getBody()) == 0)
                     {
-                        deleteMessage(dataQueueURL, m);
+                        deleteMessage(messageQueueURL, m);
                         return Operation.ADDITION;
                     }
                     else if (Operation.MULTIPLICATION.toString().compareToIgnoreCase(m.getBody()) == 0)
                     {
-                        deleteMessage(dataQueueURL, m);
+                        deleteMessage(messageQueueURL, m);
                         return Operation.MULTIPLICATION;
                     }
 
@@ -209,7 +256,7 @@ public class Worker
         catch (InterruptedException e)
         {
             e.printStackTrace();
-            return Operation.END_PROGRAM;
+            return Operation.END_OF_PROGRAM;
         }
     }
     
@@ -217,6 +264,7 @@ public class Worker
     {
         DeleteMessageRequest delMes = new DeleteMessageRequest(queueURL, m.getReceiptHandle());
         sqsClient.deleteMessage(delMes);
+        Main.incRequest();
     }
 
     public void matrixAddition()
@@ -225,31 +273,37 @@ public class Worker
         {
             
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(dataQueueURL);
-            rmr.setMaxNumberOfMessages(10);
+            rmr.setMaxNumberOfMessages(1);
 
             do
             {
                 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
                     for (Message m : messages)
                     {
-                        if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        if (Operation.END_OF_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
                             deleteMessage(dataQueueURL, m);
-                            sendConfirmation();
+                            sendEndingConfirmation(messageQueueURL);
                             return;
                         }
 
                         MatrixDoubleDataChunk chunk = new MatrixDoubleDataChunk(m.getBody());
-                        String res = processDataAddition(chunk);
-                        SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
-                        sqsClient.sendMessage(smr);
-
                         deleteMessage(dataQueueURL, m);
+
+                        List<String> res = processDataAddition(chunk);
+                        for (String r : res)
+                        {
+                            SendMessageRequest smr = new SendMessageRequest(resultQueueURL, r);
+                            sqsClient.sendMessage(smr);
+                            Main.incRequest();
+                        }
+
                     }
                 }
                 Thread.sleep(WAIT_IN_MS);
@@ -268,9 +322,6 @@ public class Worker
         try
         {
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
-            
-            
-
 
             // receiveing matrix B size
 
@@ -278,6 +329,7 @@ public class Worker
             {
 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
@@ -303,6 +355,7 @@ public class Worker
             {
                 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
@@ -323,28 +376,36 @@ public class Worker
 
 
             rmr = new ReceiveMessageRequest(dataQueueURL);
-            rmr.setMaxNumberOfMessages(10);
-            rmr.setVisibilityTimeout(600);
+            rmr.setMaxNumberOfMessages(1);
+            rmr.setVisibilityTimeout(300);
             
 
-            sendConfirmation();
-            waitForOtherWorkers();
+            // sendConfirmation();
+            // waitForOtherWorkers();
 
             // receiving data for calculations
             do
             {
 
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
                     for (Message m : messages)
                     {
-                        if (Operation.END_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        if (Operation.END_OF_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
+                            // int i = messages.indexOf(m) + 1;
                             deleteMessage(dataQueueURL, m);
-                            sendConfirmation();
+                            // for (; i < messages.size(); i++)
+                            // {
+                            // deleteMessage(dataQueueURL, messages.get(i));
+                            // resendMessage(dataQueueURL, messages.get(i).getBody());
+                            //
+                            // }
+                            sendEndingConfirmation(messageQueueURL);
                             return;
                         }
                         
@@ -356,6 +417,8 @@ public class Worker
                         {
                             SendMessageRequest smr = new SendMessageRequest(resultQueueURL, res);
                             sqsClient.sendMessage(smr);
+                            Main.incRequest();
+
                         }
 
                         deleteMessage(dataQueueURL, m);
@@ -372,26 +435,45 @@ public class Worker
         }
     }
     
-    public Message getFirstMessage()
+    public void sendConfirmation(String queueURL)
     {
-        return firstMessage;
+        SendMessageRequest smr = new SendMessageRequest(queueURL, Operation.CONFIRMATION.toString());
+        sqsClient.sendMessage(smr);
+        Main.incRequest();
     }
-
+    
+    public void sendEndingConfirmation(String queueURL)
+    {
+        SendMessageRequest smr = new SendMessageRequest(queueURL, Operation.CONFIRMATION.toString() + ","
+                + Main.getRequests());
+        sqsClient.sendMessage(smr);
+        Main.incRequest();
+    }
+    
     public void sendConfirmation()
     {
         SendMessageRequest smr = new SendMessageRequest(resultQueueURL, Operation.CONFIRMATION.toString());
         sqsClient.sendMessage(smr);
+        Main.incRequest();
+    }
+
+    public void resendMessage(String queueUrl, String body)
+    {
+        SendMessageRequest smr = new SendMessageRequest(queueUrl, body);
+        sqsClient.sendMessage(smr);
+        Main.incRequest();
     }
 
     private void waitForOtherWorkers()
     {
-        ReceiveMessageRequest rmr = new ReceiveMessageRequest(workerQueueURL);
+        ReceiveMessageRequest rmr = new ReceiveMessageRequest(messageQueueURL);
         
         try
         {
             do
             {
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Main.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
@@ -400,8 +482,9 @@ public class Worker
                     
                     if (Operation.CONFIRMATION.toString().compareToIgnoreCase(m.getBody()) == 0)
                     {
-                        DeleteMessageRequest delMes = new DeleteMessageRequest(workerQueueURL, m.getReceiptHandle());
+                        DeleteMessageRequest delMes = new DeleteMessageRequest(messageQueueURL, m.getReceiptHandle());
                         sqsClient.deleteMessage(delMes);
+                        Main.incRequest();
                         break;
                     }
                 }

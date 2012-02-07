@@ -41,4 +41,20 @@ public class MatrixResultDataChunk extends MatrixDataChunk
         return result + SEPARATOR;
     }
     
+    // @Override
+    // public String toString()
+    // {
+    // String result = "";
+    //
+    // result += numberOfRows + SEPARATOR;
+    // result += rowIndex + SEPARATOR;
+    // result += size + SEPARATOR;
+    //
+    // for (int i = 0; i < numberOfRows; i++)
+    // result += getData(data.get(i));
+    //
+    // return result;
+    //
+    // }
+    
 }

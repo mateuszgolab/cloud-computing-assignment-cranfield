@@ -2,6 +2,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 
 import java.util.List;
 
+import uk.ac.cranfield.cloudcomputing.assignment.Controller;
+import uk.ac.cranfield.cloudcomputing.assignment.common.QueueType;
 import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixResultDataChunk;
@@ -29,6 +31,7 @@ public class Master
     private AmazonSQSClient sqsClient;
     private String dataQueueURL;
     private String resultQueueURL;
+    private String messageQueueURL;
     private int rowsReceived;
     private long time;
     private Matrix matrixA;
@@ -37,10 +40,12 @@ public class Master
     private int key;
     private int numberOfWorkers;
     private StatusPanel status;
+    private MatrixOperationExecutor localWorker;
     
     
-    public Master(int workers, int size, StatusPanel status)
+    public Master(int workers, int size, StatusPanel status, MatrixOperationExecutor worker)
     {
+        this.localWorker = worker;
         this.status = status;
         rowsReceived = size;
         numberOfWorkers = workers;
@@ -51,8 +56,7 @@ public class Master
         
     }
     
-    
-    public void connectToQueues(String dataQueue, String resultQueue)
+    public void connectToQueues(String dataQueue, String resultQueue, String messageQueue)
     {
         
         try
@@ -60,11 +64,17 @@ public class Master
             CreateQueueRequest c = new CreateQueueRequest(dataQueue);
             CreateQueueResult queueResult = sqsClient.createQueue(c);
             dataQueueURL = queueResult.getQueueUrl();
-            
+            Controller.incRequest();
             
             c = new CreateQueueRequest(resultQueue);
             queueResult = sqsClient.createQueue(c);
             resultQueueURL = queueResult.getQueueUrl();
+            Controller.incRequest();
+            
+            c = new CreateQueueRequest(messageQueue);
+            queueResult = sqsClient.createQueue(c);
+            messageQueueURL = queueResult.getQueueUrl();
+            Controller.incRequest();
             
             
         }
@@ -91,6 +101,7 @@ public class Master
     public Matrix receiveResults()
     {
         
+        
         ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
         rmr.setMaxNumberOfMessages(10);
         
@@ -99,6 +110,7 @@ public class Master
             do
             {
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Controller.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
@@ -110,10 +122,11 @@ public class Master
                         
                         DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
                         sqsClient.deleteMessage(delMes);
+                        Controller.incRequest();
                         rowsReceived -= receivedChunk.getNumberOfRows();
-                        double progress = (receivedChunk.getSize() - rowsReceived) * 10000 / receivedChunk.getSize();
-                        progress /= 100;
-                        status.print("Received : " + progress + " %");
+                        int progress = (receivedChunk.getSize() - rowsReceived) * 10000 / receivedChunk.getSize();
+                        localWorker.update(progress);
+                        // status.print("Received : " + progress + " %");
                     }
                     
                 }
@@ -124,8 +137,9 @@ public class Master
             
             for (int i = 0; i < numberOfWorkers; i++)
             {
-                SendMessageRequest smr = new SendMessageRequest(dataQueueURL, Operation.END_CALCULATIONS.toString());
+                SendMessageRequest smr = new SendMessageRequest(dataQueueURL, Operation.END_OF_CALCULATIONS.toString());
                 sqsClient.sendMessage(smr);
+                Controller.incRequest();
             }
         }
         catch (AmazonServiceException ase)
@@ -145,6 +159,10 @@ public class Master
                     + "being able to access the network.");
             System.out.println("Error Message: " + ace.getMessage());
         }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+        }
         finally
         {
             // System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
@@ -162,8 +180,10 @@ public class Master
     {
         CreateQueueRequest c = new CreateQueueRequest(name);
         CreateQueueResult queueResult = sqsClient.createQueue(c);
+        Controller.incRequest();
         DeleteQueueRequest del = new DeleteQueueRequest(queueResult.getQueueUrl());
         sqsClient.deleteQueue(del);
+        Controller.incRequest();
         
     }
     
@@ -177,18 +197,21 @@ public class Master
         
         CreateQueueRequest c = new CreateQueueRequest(name);
         CreateQueueResult queueResult = sqsClient.createQueue(c);
+        Controller.incRequest();
         String queueURL = queueResult.getQueueUrl();
         
         do
         {
             ReceiveMessageRequest rmr = new ReceiveMessageRequest(queueURL);
             ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+            Controller.incRequest();
             List<Message> messages = result.getMessages();
             
             if (messages.size() > 0)
             {
                 DeleteMessageRequest delMes = new DeleteMessageRequest(queueURL, messages.get(0).getReceiptHandle());
                 sqsClient.deleteMessage(delMes);
+                Controller.incRequest();
                 n--;
             }
             
@@ -204,15 +227,42 @@ public class Master
     {
         for (int i = 0; i < numberOfWorkers; i++)
         {
-            SendMessageRequest smr = new SendMessageRequest(dataQueueURL, op.toString());
+            SendMessageRequest smr = new SendMessageRequest(messageQueueURL, op.toString());
             sqsClient.sendMessage(smr);
+            Controller.incRequest();
         }
         
     }
     
-    public void receiveMessages(Operation op)
+    public void sendMessage(Operation op, int nodes)
     {
-        ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
+        for (int i = 0; i < nodes; i++)
+        {
+            SendMessageRequest smr = new SendMessageRequest(dataQueueURL, op.toString());
+            sqsClient.sendMessage(smr);
+            Controller.incRequest();
+        }
+        
+    }
+    
+    public void receiveMessages(Operation op, QueueType type)
+    {
+        
+        String queueURL = "";
+        
+        switch (type) {
+            case DATA:
+                queueURL = dataQueueURL;
+                break;
+            case RESULT:
+                queueURL = resultQueueURL;
+                break;
+            case MESSAGE:
+                queueURL = messageQueueURL;
+                break;
+        }
+        
+        ReceiveMessageRequest rmr = new ReceiveMessageRequest(queueURL);
         rmr.setMaxNumberOfMessages(10);
         int n = numberOfWorkers;
         
@@ -222,16 +272,18 @@ public class Master
             do
             {
                 ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Controller.incRequest();
                 List<Message> messages = result.getMessages();
                 
                 if (messages.size() > 0)
                 {
                     for (Message m : messages)
                     {
-                        if (Operation.CONFIRMATION.toString().compareToIgnoreCase(m.getBody()) == 0)
+                        if (op.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
-                            DeleteMessageRequest delMes = new DeleteMessageRequest(resultQueueURL, m.getReceiptHandle());
+                            DeleteMessageRequest delMes = new DeleteMessageRequest(queueURL, m.getReceiptHandle());
                             sqsClient.deleteMessage(delMes);
+                            Controller.incRequest();
                             n--;
                         }
                     }
@@ -246,6 +298,88 @@ public class Master
         catch (InterruptedException e)
         {
             e.printStackTrace();
+        }
+    }
+    
+    public Integer receiveEndingMessages(QueueType type)
+    {
+        
+        String queueURL = "";
+        
+        switch (type) {
+            case DATA:
+                queueURL = dataQueueURL;
+                break;
+            case RESULT:
+                queueURL = resultQueueURL;
+                break;
+            case MESSAGE:
+                queueURL = messageQueueURL;
+                break;
+        }
+        
+        ReceiveMessageRequest rmr = new ReceiveMessageRequest(queueURL);
+        rmr.setMaxNumberOfMessages(10);
+        int n = numberOfWorkers;
+        Integer cost = 0;
+        
+        try
+        {
+            
+            do
+            {
+                ReceiveMessageResult result = sqsClient.receiveMessage(rmr);
+                Controller.incRequest();
+                List<Message> messages = result.getMessages();
+                
+                if (messages.size() > 0)
+                {
+                    for (Message m : messages)
+                    {
+                        String[] s = m.getBody().split(",");
+                        
+                        if (Operation.CONFIRMATION.toString().compareToIgnoreCase(s[0]) == 0)
+                        {
+                            DeleteMessageRequest delMes = new DeleteMessageRequest(queueURL, m.getReceiptHandle());
+                            sqsClient.deleteMessage(delMes);
+                            Controller.incRequest();
+                            n--;
+                            cost += Integer.parseInt(s[1]);
+                        }
+                    }
+                }
+                
+                Thread.sleep(WAIT_IN_MS);
+                
+                
+            } while (n > 0);
+            
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        
+        return cost;
+    }
+    
+    public void removeWorkerQueues(List<String> queueURLs)
+    {
+        for (String url : queueURLs)
+        {
+            DeleteQueueRequest del = new DeleteQueueRequest(url);
+            sqsClient.deleteQueue(del);
+            Controller.incRequest();
+        }
+    }
+    
+    public void sendMessageToWorkers(Operation op)
+    {
+        for (int i = 0; i < numberOfWorkers; i++)
+        {
+            SendMessageRequest smr = new SendMessageRequest(messageQueueURL, op.toString());
+            sqsClient.sendMessage(smr);
+            Controller.incRequest();
         }
     }
 }

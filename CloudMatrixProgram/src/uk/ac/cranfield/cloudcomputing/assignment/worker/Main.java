@@ -11,7 +11,9 @@ public class Main
     
     public static final String DATA_QUEUE = "matDataQueue";
     public static final String RESULT_QUEUE = "matResultQueue";
+    public static final String MESSAGE_QUEUE = "matMessageQueue";
     private static String workerQueue;
+    private static Integer requestCounter;
 
 
     public static void main(String[] args)
@@ -24,27 +26,37 @@ public class Main
 
         // workerQueue = "i-6c4a0c_matWorkerQueue";
         
+        long waitingTimeInMs = 100;
+        requestCounter = 0;
+        
         try
         {
             
             Worker worker = new Worker();
-            worker.connectToQueues(DATA_QUEUE, RESULT_QUEUE, workerQueue);
+            worker.connectToQueues(DATA_QUEUE, RESULT_QUEUE, MESSAGE_QUEUE, workerQueue);
             
             while (true)
             {
                 switch (worker.receiveStartingMessage()) {
                     case ADDITION:
+                        requestCounter = 0;
                         worker.sendConfirmation();
                         worker.matrixAddition();
+                        waitingTimeInMs = 100;
                         break;
                     case MULTIPLICATION:
+                        requestCounter = 0;
                         worker.sendConfirmation();
                         worker.matrixMultiplication();
+                        waitingTimeInMs = 100;
                         break;
-                    case END_PROGRAM:
+                    case SUSPENSION:
+                        waitingTimeInMs = 3000;
+                    case END_OF_PROGRAM:
                         // worker.removeWorkerQueue();
                         return;
                 }
+                Thread.sleep(waitingTimeInMs);
             }
         }
         catch (AmazonServiceException ase)
@@ -57,5 +69,20 @@ public class Main
             System.out.println("Error Type:           " + ase.getErrorType());
             System.out.println("Request ID:           " + ase.getRequestId());
         }
+        catch (InterruptedException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+    
+    public static void incRequest()
+    {
+        requestCounter++;
+    }
+    
+    public static Integer getRequests()
+    {
+        return requestCounter;
     }
 }
