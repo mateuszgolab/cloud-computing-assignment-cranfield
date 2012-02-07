@@ -34,14 +34,14 @@ public class MatrixDoubleDataChunk extends MatrixDataChunk
             
             for (; i < size; i++)
             {
-                row[i] = results[3].charAt(j * size + i) - '0';
+                row[i] = results[3].charAt(j * 2 * size + i) - '0';
             }
             
             data.add(row);
             
             for (; i < 2 * size; i++)
             {
-                row2[i] = results[3].charAt(j * size + i) - '0';
+                row2[i - size] = results[3].charAt(j * 2 * size + i) - '0';
             }
             
             data2.add(row2);

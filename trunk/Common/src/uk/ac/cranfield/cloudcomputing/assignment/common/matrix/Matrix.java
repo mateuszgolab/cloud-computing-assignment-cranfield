@@ -191,7 +191,7 @@ public class Matrix
         
         rows = size / parts;
         
-        if (parts % rows != 0)
+        if (rows != 0 && parts % rows != 0)
             rows++;
         
         if (rows * size > MatrixDataChunk.SIZE_LIMIT)

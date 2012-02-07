@@ -25,6 +25,7 @@ public class QueueCleaner
     public static final String DATA_QUEUE = "matDataQueue";
     public static final String RESULT_QUEUE = "matResultQueue";
     public static final String workerQueue = "i-c0f08e89workerQueue";
+    public static final String MESSAGE_QUEUE = "matMessageQueue";
     
     public QueueCleaner()
     {
@@ -65,8 +66,9 @@ public class QueueCleaner
         QueueCleaner q = new QueueCleaner();
         
         // q.clearQueue("i-9c3177d5_matWorkerQueue", 1);
-        q.clearQueue(DATA_QUEUE, 1);
-        // q.clearQueue(RESULT_QUEUE, 3);
+        q.clearQueue(DATA_QUEUE, 32);
+        // q.clearQueue(RESULT_QUEUE, 23);
+        q.clearQueue(MESSAGE_QUEUE, 2);
         
     }
 }

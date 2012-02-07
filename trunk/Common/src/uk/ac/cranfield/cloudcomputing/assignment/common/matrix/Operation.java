@@ -3,8 +3,8 @@ package uk.ac.cranfield.cloudcomputing.assignment.common.matrix;
 
 public enum Operation
 {
-    ADDITION("Add matrixes"), MULTIPLICATION("Multiply matrixes"), END_CALCULATIONS("End"), END_PROGRAM("End program"), CONFIRMATION(
-            "Received");
+    ADDITION("Add matrixes"), MULTIPLICATION("Multiply matrixes"), END_OF_CALCULATIONS("End"), END_OF_PROGRAM("End program"), CONFIRMATION(
+            "Received"), SUSPENSION("Suspended");
     
     private String operation;
     

@@ -147,6 +147,16 @@ public class CloudEnvironment
             workerQueuesNames.add(instance.getInstanceId() + "_matWorkerQueue");
         }
         
+        try
+        {
+            Thread.sleep(100);
+        }
+        catch (InterruptedException e)
+        {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        
         for (String id : instancesIds)
         {
             CreateTagsRequest createTagsRequest = new CreateTagsRequest();
@@ -215,4 +225,5 @@ public class CloudEnvironment
     {
         return instancesIds;
     }
+    
 }

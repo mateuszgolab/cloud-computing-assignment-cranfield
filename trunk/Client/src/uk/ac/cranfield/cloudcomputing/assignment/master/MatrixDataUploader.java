@@ -3,6 +3,9 @@ package uk.ac.cranfield.cloudcomputing.assignment.master;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.JOptionPane;
+
+import uk.ac.cranfield.cloudcomputing.assignment.Controller;
 import uk.ac.cranfield.cloudcomputing.assignment.common.credentials.AWSCredentialsBean;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.Matrix;
 import uk.ac.cranfield.cloudcomputing.assignment.common.matrix.MatrixDataChunk;
@@ -22,20 +25,26 @@ public class MatrixDataUploader
     public static final String ENDPOINT_ZONE = "sqs.eu-west-1.amazonaws.com";
     
     protected List<String> queuesURLs;
+    protected String messageQueue;
+    protected String messageQueueURL;
     private List<String> queuesNames;
     protected AmazonSQSClient sqsClient;
     protected Matrix matrix;
     protected int numberOfDataBlocks;
+    List<MatrixDataChunk> chunks;
     
-    public MatrixDataUploader(Matrix matrix, List<String> queues, int numberOfDataBlocks)
+    public MatrixDataUploader(Matrix matrix, List<String> queues, String messageQueue, int numberOfDataBlocks)
     {
         this.numberOfDataBlocks = numberOfDataBlocks;
         this.queuesNames = queues;
+        this.messageQueue = messageQueue;
         this.matrix = matrix;
         this.queuesURLs = new ArrayList<String>();
         
         sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
+        
+        chunks = matrix.decompose(numberOfDataBlocks);
         
     }
     
@@ -49,6 +58,15 @@ public class MatrixDataUploader
         sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
+        chunks = matrix.decompose(numberOfDataBlocks);
+        
+        
+        if (chunks.size() != numberOfDataBlocks)
+            JOptionPane.showMessageDialog(null, "Matrix is too big to be divided into " + numberOfDataBlocks
+                    + " parts. It was divided into " + chunks.size() + " data blocks",
+                    "Data blocks number relcalculated", JOptionPane.WARNING_MESSAGE);
+        
+        
     }
     
     public void connectToQueue()
@@ -59,8 +77,16 @@ public class MatrixDataUploader
             {
                 CreateQueueRequest c = new CreateQueueRequest(q);
                 CreateQueueResult queueResult = sqsClient.createQueue(c);
+                Controller.incRequest();
                 queuesURLs.add(queueResult.getQueueUrl());
+                Controller.incRequest();
             }
+            
+            CreateQueueRequest c = new CreateQueueRequest(messageQueue);
+            CreateQueueResult queueResult = sqsClient.createQueue(c);
+            Controller.incRequest();
+            messageQueueURL = queueResult.getQueueUrl();
+            Controller.incRequest();
             
         }
         catch (AmazonServiceException ase)
@@ -84,7 +110,7 @@ public class MatrixDataUploader
     
     public void send()
     {
-        List<MatrixDataChunk> chunks = matrix.decompose(numberOfDataBlocks);
+        
         
         for (MatrixDataChunk chunk : chunks)
         {
@@ -93,6 +119,7 @@ public class MatrixDataUploader
             {
                 SendMessageRequest smr = new SendMessageRequest(queue, data);
                 sqsClient.sendMessage(smr);
+                Controller.incRequest();
             }
         }
         
@@ -100,10 +127,17 @@ public class MatrixDataUploader
     
     public void sendMessageToWorkers(Operation op)
     {
-        for (String url : queuesURLs)
+        
+        for (String s : queuesURLs)
         {
-            SendMessageRequest smr = new SendMessageRequest(url, op.toString());
+            SendMessageRequest smr = new SendMessageRequest(messageQueueURL, op.toString());
             sqsClient.sendMessage(smr);
+            Controller.incRequest();
         }
+    }
+    
+    public List<String> getWorkerQueuesURLs()
+    {
+        return queuesURLs;
     }
 }
