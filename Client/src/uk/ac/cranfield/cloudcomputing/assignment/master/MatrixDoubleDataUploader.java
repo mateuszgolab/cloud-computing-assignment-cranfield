@@ -24,12 +24,13 @@ public class MatrixDoubleDataUploader extends MatrixDataUploader
     {
         super(matrixA, queue, numberOfDataBlocks);
         matrix2 = matrixB;
+        
+        
     }
     
     @Override
-    public void send()
+    public void send(boolean info)
     {
-        
         List<MatrixDoubleDataChunk> chunks = matrix.decompose(numberOfDataBlocks, matrix2);
         
         for (MatrixDoubleDataChunk chunk : chunks)

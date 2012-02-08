@@ -8,7 +8,6 @@ import java.util.Random;
 public class Matrix
 {
     
-    
     private Integer[][] matrix;
     private int size;
     
@@ -40,22 +39,8 @@ public class Matrix
         }
     }
     
-    public void print()
-    {
-        for (int i = 0; i < size; i++)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                System.out.print(matrix[i][j] + " ");
-            }
-            System.out.println("");
-        }
-        System.out.println("================================================================================");
-    }
-    
     public Matrix add(Matrix m)
     {
-        long time = System.currentTimeMillis();
         
         if (m.getSize() != size)
             return null;
@@ -70,15 +55,11 @@ public class Matrix
             }
         }
         
-        // System.out.println("Sequential " + size + " x " + size + " matrix addition time elapsed : "
-        // + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
-        //
         return result;
     }
     
     public Matrix multiply(Matrix m)
     {
-        long time = System.currentTimeMillis();
         
         if (m.getSize() != size)
             return null;
@@ -98,8 +79,6 @@ public class Matrix
             }
         }
         
-        // System.out.println("Sequential " + size + " x " + size + " matrix multiplication time elapsed : "
-        // + Integer.toString((int) (System.currentTimeMillis() - time)) + " ms");
         
         return result;
     }
@@ -255,9 +234,11 @@ public class Matrix
         {
             rows = MatrixDataChunk.SIZE_LIMIT / doubleSize;
             parts = size / rows;
-            if (MatrixDataChunk.SIZE_LIMIT % size != 0)
+            if (size % rows != 0)
                 parts++;
         }
+        
+        rows = size / parts;
         
         
         if (size % parts == 0)

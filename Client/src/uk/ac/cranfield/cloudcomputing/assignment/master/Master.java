@@ -101,7 +101,6 @@ public class Master
     public Matrix receiveResults()
     {
         
-        
         ReceiveMessageRequest rmr = new ReceiveMessageRequest(resultQueueURL);
         rmr.setMaxNumberOfMessages(10);
         
@@ -126,7 +125,6 @@ public class Master
                         rowsReceived -= receivedChunk.getNumberOfRows();
                         int progress = (receivedChunk.getSize() - rowsReceived) * 10000 / receivedChunk.getSize();
                         localWorker.update(progress);
-                        // status.print("Received : " + progress + " %");
                     }
                     
                 }
@@ -165,13 +163,6 @@ public class Master
         }
         finally
         {
-            // System.out.println("Parallel cloud  " + matrixA.getSize() + " x " + matrixB.getSize()
-            // + " matrix addition time elapsed : " + Integer.toString((int) (System.currentTimeMillis() - time))
-            // + " ms");
-            // matrixA.print();
-            // matrixB.print();
-            // matrixResult.print();
-            
             return matrixResult;
         }
     }
