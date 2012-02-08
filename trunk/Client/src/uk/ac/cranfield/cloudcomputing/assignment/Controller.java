@@ -2,7 +2,6 @@ package uk.ac.cranfield.cloudcomputing.assignment;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -28,7 +27,7 @@ public class Controller implements ActionListener
     public static final String LINUX_32_AMI = "ami-973b06e3";
     // public static final String WORKER_AMI = "ami-53fdc327";
     // public static final String WORKER_AMI = "ami-2deed059"; << AMI5
-    public static final String WORKER_AMI = "ami-bfe9d7cb";
+    public static final String WORKER_AMI = "ami-b1dde3c5";
     public static final String WORKER_NAME = "matWorker";
     public static final Integer KEY = 10;
     private MainPanel panel;
@@ -58,8 +57,6 @@ public class Controller implements ActionListener
     {
         if (e.getSource().equals(panel.getStartAdditionButton()))
         {
-            if (panel.wrongValues())
-                return;
             
             panel.reset();
             status.reset();
@@ -68,15 +65,15 @@ public class Controller implements ActionListener
             numberOfNodes = panel.getNumberOfNodes();
             requestCounter = 0;
             
-            // if (env.getInstancesIds().size() < numberOfNodes)
-            // {
-            // env.createInstances(numberOfNodes - env.getInstancesIds().size(), WORKER_NAME, WORKER_AMI);
-            // status.print("starting instances ...");
-            // }
-            // else if (env.getInstancesIds().size() > numberOfNodes)
-            // {
-            // master.sendMessage(Operation.SUSPENSION, env.getInstancesIds().size() - numberOfNodes);
-            // }
+            if (env.getInstancesIds().size() < numberOfNodes)
+            {
+                env.createInstances(numberOfNodes - env.getInstancesIds().size(), WORKER_NAME, WORKER_AMI);
+                status.print("starting instances ...");
+            }
+            else if (env.getInstancesIds().size() > numberOfNodes)
+            {
+                master.sendMessage(Operation.SUSPENSION, env.getInstancesIds().size() - numberOfNodes);
+            }
             DistributedMatrixAddition distAddition = new DistributedMatrixAddition();
             
             master = new Master(numberOfNodes, matrixSize, status, distAddition);
@@ -99,15 +96,15 @@ public class Controller implements ActionListener
             numberOfNodes = panel.getNumberOfNodes();
             requestCounter = 0;
             
-            // if (env.getInstancesIds().size() < numberOfNodes)
-            // {
-            // env.createInstances(numberOfNodes - env.getInstancesIds().size(), WORKER_NAME, WORKER_AMI);
-            // status.print("starting instances ...");
-            // }
-            // else if (env.getInstancesIds().size() > numberOfNodes)
-            // {
-            // master.sendMessage(Operation.SUSPENSION, env.getInstancesIds().size() - numberOfNodes);
-            // }
+            if (env.getInstancesIds().size() < numberOfNodes)
+            {
+                env.createInstances(numberOfNodes - env.getInstancesIds().size(), WORKER_NAME, WORKER_AMI);
+                status.print("starting instances ...");
+            }
+            else if (env.getInstancesIds().size() > numberOfNodes)
+            {
+                master.sendMessage(Operation.SUSPENSION, env.getInstancesIds().size() - numberOfNodes);
+            }
             
             
             DistributedMatrixMultiplication distMultiplication = new DistributedMatrixMultiplication();
@@ -132,16 +129,20 @@ public class Controller implements ActionListener
     
     private long localMatrixAddition()
     {
+        status.print("local matrix addition in progress ...");
         long time = System.currentTimeMillis();
         matrixLocalResult = matrixA.add(matrixB);
+        status.print("local matrix addition finished");
         return System.currentTimeMillis() - time;
+        
     }
     
     private long localMatrixMultiplication()
     {
         long time = System.currentTimeMillis();
-        status.print("local matrix multiplication started");
+        status.print("local matrix multiplication in progress ...");
         matrixLocalResult = matrixA.multiply(matrixB);
+        matrixLocalResult = matrixB;
         status.print("local matrix multiplication finished");
         return System.currentTimeMillis() - time;
         
@@ -182,13 +183,12 @@ public class Controller implements ActionListener
             status.print("uploading B matrices...");
             
             
-            String[] ss = {"qq2_matWorkerQueue", "qq1_matWorkerQueue"};
+            // String[] ss = {"qq2_matWorkerQueue", "qq1_matWorkerQueue"};
             
-            // MatrixDataUploader uploader = new MatrixDataUploader(matrixB, env.getWorkerQueuesNames(), MESSAGE_QUEUE,
-            // 1);
-            MatrixDataUploader uploader = new MatrixDataUploader(matrixB, Arrays.asList(ss), MESSAGE_QUEUE, 1);
+            MatrixDataUploader uploader = new MatrixDataUploader(matrixB, env.getWorkerQueuesNames(), MESSAGE_QUEUE, 1);
+            // MatrixDataUploader uploader = new MatrixDataUploader(matrixB, Arrays.asList(ss), MESSAGE_QUEUE, 1);
             uploader.connectToQueue();
-            uploader.send();
+            uploader.send(false);
             status.print("B matrices uploaded");
             
             // master.receiveMessages(Operation.CONFIRMATION);
@@ -201,11 +201,11 @@ public class Controller implements ActionListener
             
             status.print("decomposing and sending matrix A ...");
             uploader = new MatrixDataUploader(matrixA, master.getDataQueueURL(), numberOfDataBlocks);
-            uploader.send();
+            uploader.send(true);
             workersQueuesURLs = uploader.getWorkerQueuesURLs();
             status.print("matrix A chunks uploaded");
             
-            status.print("receiving results from the cloud...");
+            status.print("distributed matrix multiplication in progress ...");
             matrixResult = master.receiveResults();
             // matrixResult.print();
             status.print("distributed matrix multiplication finished");
@@ -258,9 +258,9 @@ public class Controller implements ActionListener
         {
             try
             {
-                panel.setLocalResults("Local matrix multiplication time : " + get() + " ms");
-                requestCounter += master.receiveEndingMessages(QueueType.MESSAGE);
+                requestCounter += master.receiveEndingMessages(QueueType.RESULT);
                 panel.setCost(getCost());
+                panel.setLocalResults("Local matrix multiplication time : " + get() + " ms");
                 validateResults();
             }
             catch (InterruptedException e)
@@ -288,13 +288,10 @@ public class Controller implements ActionListener
     private class DistributedMatrixAddition extends MatrixOperationExecutor
     {
         
-        
         @Override
         protected Long doInBackground() throws Exception
         {
             
-            // master = new Master(numberOfNodes, matrixSize, status, DistributedMatrixAddition.this);
-            // master.connectToQueues(DATA_QUEUE, RESULT_QUEUE, MESSAGE_QUEUE);
             
             master.sendMessage(Operation.ADDITION);
             master.receiveMessages(Operation.CONFIRMATION, QueueType.RESULT);
@@ -303,10 +300,10 @@ public class Controller implements ActionListener
             status.print("decomposing and sending matrix A and B ...");
             MatrixDoubleDataUploader doubleUploader = new MatrixDoubleDataUploader(matrixA, matrixB,
                     master.getDataQueueURL(), numberOfDataBlocks);
-            doubleUploader.send();
+            doubleUploader.send(true);
             status.print("matrix A and B chunks uploaded");
             
-            status.print("receiving results from the cloud...");
+            status.print("distributed matrix addition in progress ...");
             matrixResult = master.receiveResults();
             
             return System.currentTimeMillis() - time;
@@ -324,7 +321,7 @@ public class Controller implements ActionListener
         {
             try
             {
-                requestCounter += master.receiveEndingMessages(QueueType.MESSAGE);
+                requestCounter += master.receiveEndingMessages(QueueType.RESULT);
                 
                 panel.setDistResults("Distributed matrix addition time : " + get() + " ms");
                 long time = localMatrixAddition();

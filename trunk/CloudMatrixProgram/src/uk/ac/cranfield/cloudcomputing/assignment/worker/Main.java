@@ -5,7 +5,11 @@ import java.util.logging.Logger;
 
 import com.amazonaws.AmazonServiceException;
 
-
+/**
+ * Main function of the program working on the Cloud environment
+ * @author Mateusz Golab
+ * @version 1.0
+ */
 public class Main
 {
     
@@ -15,7 +19,10 @@ public class Main
     private static String workerQueue;
     private static Integer requestCounter;
 
-
+    /**
+     * Main function of the Worker
+     * @param args
+     */
     public static void main(String[] args)
     {
         Logger.getLogger("com.amazonaws.request").setLevel(Level.SEVERE);
@@ -24,7 +31,6 @@ public class Main
             return;
         workerQueue = args[0] + "_matWorkerQueue";
 
-        // workerQueue = "i-6c4a0c_matWorkerQueue";
         
         long waitingTimeInMs = 100;
         requestCounter = 0;
@@ -53,7 +59,7 @@ public class Main
                     case SUSPENSION:
                         waitingTimeInMs = 3000;
                     case END_OF_PROGRAM:
-                        // worker.removeWorkerQueue();
+                        worker.removeWorkerQueue();
                         return;
                 }
                 Thread.sleep(waitingTimeInMs);
@@ -71,7 +77,6 @@ public class Main
         }
         catch (InterruptedException e)
         {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

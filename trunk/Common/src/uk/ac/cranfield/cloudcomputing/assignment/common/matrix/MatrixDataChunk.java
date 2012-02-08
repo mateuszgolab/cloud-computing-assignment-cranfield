@@ -4,7 +4,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-
+/**
+ * Class representing matrix data chunk
+ * Used for matrix multiplication
+ * @author Mateusz Golab
+ * @version 1.0
+ */
 public class MatrixDataChunk
 {
     
@@ -16,12 +21,21 @@ public class MatrixDataChunk
     protected List<Integer[]> data;
     protected String[] results;
     
-    
+    /**
+     * default constructor
+     */
     public MatrixDataChunk()
     {
         data = new ArrayList<Integer[]>();
     }
     
+    /**
+     * Constructs matrix data chunk
+     * @param numberOfRows number of rows in a chunk
+     * @param rowIndex index of first row
+     * @param size matrix size
+     * @param data matrix chunk data
+     */
     public MatrixDataChunk(int numberOfRows, int rowIndex, int size, List<Integer[]> data)
     {
         this.numberOfRows = numberOfRows;
@@ -30,6 +44,10 @@ public class MatrixDataChunk
         this.data = data;
     }
     
+    /**
+     * This constuctor is used to create a chunk from received message
+     * @param string body of received message
+     */
     public MatrixDataChunk(String string)
     {
         this();
@@ -53,6 +71,7 @@ public class MatrixDataChunk
     }
     
     /**
+     * Returns chunk data in specified format
      * ******************************************
      * |numberOfows|rowIndex|size|Matrix rows|
      * ******************************************
@@ -73,32 +92,54 @@ public class MatrixDataChunk
         
     }
     
+    /**
+     * Returns data for message
+     * @param data given data
+     * @return
+     */
     protected String getData(Integer[] data)
     {
         String result = Arrays.toString(data).replace(", ", "");
         return result.substring(1, result.length() - 1);
     }
     
+    /**
+     * @return index of the first row
+     */
     public int getRowIndex()
     {
         return rowIndex;
     }
     
+    /**
+     * @return matrix rows data
+     */
     public List<Integer[]> getMatrixRows()
     {
         return data;
     }
     
+    
+    /**
+     * @return matrix size
+     */
     public int getSize()
     {
         return size;
     }
     
+    /**
+     * -@return number of rows
+     */
     public int getNumberOfRows()
     {
         return numberOfRows;
     }
     
+    /**
+     * @param row returns number of digits in given data row
+     * @return
+     */
     public static int getRowLength(Integer[] row)
     {
         return Arrays.toString(row).replace(" ", "").length() - 2;

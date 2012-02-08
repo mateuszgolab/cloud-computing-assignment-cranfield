@@ -44,7 +44,6 @@ public class MatrixDataUploader
         sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
         
-        chunks = matrix.decompose(numberOfDataBlocks);
         
     }
     
@@ -57,14 +56,6 @@ public class MatrixDataUploader
         
         sqsClient = new AmazonSQSClient(AWSCredentialsBean.getCredentials());
         sqsClient.setEndpoint(ENDPOINT_ZONE);
-        
-        chunks = matrix.decompose(numberOfDataBlocks);
-        
-        
-        if (chunks.size() != numberOfDataBlocks)
-            JOptionPane.showMessageDialog(null, "Matrix is too big to be divided into " + numberOfDataBlocks
-                    + " parts. It was divided into " + chunks.size() + " data blocks",
-                    "Data blocks number relcalculated", JOptionPane.WARNING_MESSAGE);
         
         
     }
@@ -108,8 +99,17 @@ public class MatrixDataUploader
         }
     }
     
-    public void send()
+    public void send(boolean info)
     {
+        chunks = matrix.decompose(numberOfDataBlocks);
+        
+        
+        if (chunks.size() != numberOfDataBlocks && info)
+        {
+            JOptionPane.showMessageDialog(null, "Matrix is too big to be divided into " + numberOfDataBlocks
+                    + " parts. It was divided into " + chunks.size() + " data blocks",
+                    "Data blocks number relcalculated", JOptionPane.WARNING_MESSAGE);
+        }
         
         
         for (MatrixDataChunk chunk : chunks)

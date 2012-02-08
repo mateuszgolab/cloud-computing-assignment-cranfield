@@ -136,7 +136,7 @@ public class Worker
             
         }
 
-        if (rowsCount < chunk.getNumberOfRows())
+        if (resultChunks.size() > 0)
         {
             resultChunks.add(new MatrixResultDataChunk(rowsCount, rowIndex, chunk.getSize(), resultRows)
                     .toString());
@@ -154,6 +154,11 @@ public class Worker
     {
         List<Integer[]> rows = chunk.getMatrixRows();
         List<Integer[]> allRowsResults = new ArrayList<Integer[]>();
+        int totalResultSize = 0;
+        int rowsNumber = 0;
+        int rowIndex = chunk.getRowIndex();
+        List<Integer[]> rowsResult = new ArrayList<Integer[]>();
+        List<String> chunksResult = new ArrayList<String>();
         
         for (Integer[] row : rows)
         {
@@ -167,48 +172,40 @@ public class Worker
                 }
             }
             
-            allRowsResults.add(resultRow);
-        }
-        
-        int totalResultSize = 0;
-        int rowsNumber = 0;
-        int rowIndex = chunk.getRowIndex();
-        List<Integer[]> rowsResult = new ArrayList<Integer[]>();
-        List<MatrixResultDataChunk> chunksResult = new ArrayList<MatrixResultDataChunk>();
-        
-        for(Integer[] in : allRowsResults)
-        {
-            int size = MatrixDataChunk.getRowLength(in);
+       
+            int size = MatrixDataChunk.getRowLength(resultRow);
             
             if(totalResultSize + size <= MatrixDataChunk.SIZE_LIMIT)
             {
                 totalResultSize += size;
                 rowsNumber++;
-                rowsResult.add(in);
+                rowsResult.add(resultRow);
             }
             else
             {
                 chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(),
-                        rowsResult));
+                        rowsResult).toString());
                 rowIndex += rowsNumber;
 
                 rowsResult = new ArrayList<Integer[]>();
                 rowsNumber = 1;
                 totalResultSize = size;
-                rowsResult.add(in);
+                rowsResult.add(resultRow);
             }
         }
         
-        chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(),
-                rowsResult));
-        
-        List<String> finalResults = new ArrayList<String>();
-        for (MatrixDataChunk ch : chunksResult)
+        if (chunksResult.size() > 0)
         {
-            finalResults.add(ch.toString());
+            
+            chunksResult.add(new MatrixResultDataChunk(rowsNumber, rowIndex, chunk.getSize(), rowsResult).toString());
+        }
+        else
+        {
+            chunksResult.add(new MatrixResultDataChunk(chunk.getNumberOfRows(), chunk.getRowIndex(), chunk.getSize(),
+                    rowsResult).toString());
         }
         
-        return finalResults;
+        return chunksResult;
         
     }
     
@@ -289,7 +286,7 @@ public class Worker
                         if (Operation.END_OF_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
                             deleteMessage(dataQueueURL, m);
-                            sendEndingConfirmation(messageQueueURL);
+                            sendEndingConfirmation(resultQueueURL);
                             return;
                         }
 
@@ -380,9 +377,6 @@ public class Worker
             rmr.setVisibilityTimeout(300);
             
 
-            // sendConfirmation();
-            // waitForOtherWorkers();
-
             // receiving data for calculations
             do
             {
@@ -397,15 +391,8 @@ public class Worker
                     {
                         if (Operation.END_OF_CALCULATIONS.toString().compareToIgnoreCase(m.getBody()) == 0)
                         {
-                            // int i = messages.indexOf(m) + 1;
                             deleteMessage(dataQueueURL, m);
-                            // for (; i < messages.size(); i++)
-                            // {
-                            // deleteMessage(dataQueueURL, messages.get(i));
-                            // resendMessage(dataQueueURL, messages.get(i).getBody());
-                            //
-                            // }
-                            sendEndingConfirmation(messageQueueURL);
+                            sendEndingConfirmation(resultQueueURL);
                             return;
                         }
                         

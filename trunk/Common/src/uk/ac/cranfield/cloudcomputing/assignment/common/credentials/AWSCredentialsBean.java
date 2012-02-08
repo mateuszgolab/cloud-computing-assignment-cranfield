@@ -7,8 +7,8 @@ import com.amazonaws.auth.BasicAWSCredentials;
 public class AWSCredentialsBean
 {
     
-    private static String accessKeyId = "AKIAJ2KOCJHIWA4JVTYQ";
-    private static String secretAccessKey = "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";
+    private static String accessKeyId = "***";
+    private static String secretAccessKey = "***";
     
     public AWSCredentialsBean(String keyId, String secretKey)
     {
