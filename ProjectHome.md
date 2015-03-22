@@ -1,0 +1,1 @@
+Cloud computing application using Amazon AWS capable of performing matrix addition and multiplication. From 1 to 8 worker nodes possible. Master Worker and shared queue patterns applied. Amazon SQS used for communication.
